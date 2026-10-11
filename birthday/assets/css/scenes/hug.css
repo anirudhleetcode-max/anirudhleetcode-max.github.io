@@ -1,0 +1,178 @@
+/* ---------- The Friendship Trail (scene id 'hug'): a golden trail of memory lights, two best friends side by side ---------- */
+.scene-hug {
+  background:
+    radial-gradient(ellipse 70% 42% at 50% 47%, rgba(255, 200, 120, .07), transparent 70%),
+    radial-gradient(ellipse 120% 85% at 50% 58%, #2c1545 0%, #1a0d2c 48%, #0b0614 100%);
+}
+
+/* night sky: a few faint stars (static) and a soft plum haze low down */
+.ft-sky {
+  position: absolute; inset: -3%; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(1.2px 1.2px at 8% 14%, rgba(255, 244, 220, .75), transparent 70%),
+    radial-gradient(1px 1px at 21% 31%, rgba(255, 244, 220, .5), transparent 70%),
+    radial-gradient(1.4px 1.4px at 33% 9%, rgba(255, 236, 200, .7), transparent 70%),
+    radial-gradient(1px 1px at 46% 22%, rgba(217, 200, 245, .55), transparent 70%),
+    radial-gradient(1.3px 1.3px at 61% 12%, rgba(255, 244, 220, .65), transparent 70%),
+    radial-gradient(1px 1px at 74% 35%, rgba(255, 244, 220, .45), transparent 70%),
+    radial-gradient(1.5px 1.5px at 88% 8%, rgba(255, 236, 200, .7), transparent 70%),
+    radial-gradient(1px 1px at 93% 41%, rgba(217, 200, 245, .5), transparent 70%),
+    radial-gradient(1.2px 1.2px at 14% 52%, rgba(255, 244, 220, .4), transparent 70%),
+    radial-gradient(1px 1px at 84% 61%, rgba(255, 244, 220, .35), transparent 70%),
+    radial-gradient(1.1px 1.1px at 5% 78%, rgba(217, 200, 245, .35), transparent 70%),
+    radial-gradient(1px 1px at 96% 84%, rgba(255, 244, 220, .3), transparent 70%),
+    radial-gradient(ellipse 90% 40% at 50% 104%, rgba(107, 63, 160, .22), transparent 70%);
+}
+
+/* the scene turns warm when the last point is lit (opacity only) */
+.ft-warm {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none; will-change: opacity;
+  background:
+    radial-gradient(ellipse 58% 44% at var(--fx, 78%) var(--fy, 26%), rgba(255, 208, 132, .36), rgba(255, 170, 90, .12) 48%, transparent 76%),
+    radial-gradient(ellipse 85% 56% at 50% 58%, rgba(255, 186, 110, .22), transparent 72%),
+    linear-gradient(180deg, rgba(120, 60, 90, 0) 30%, rgba(176, 96, 62, .26) 100%);
+}
+
+/* the light the previous chapter bloomed into; it becomes the thread */
+.ft-bloom {
+  position: absolute; left: 0; top: 0; z-index: 2; width: 0; height: 0; pointer-events: none; will-change: transform, opacity;
+}
+.ft-bloom::before {
+  content: ''; position: absolute; left: -24vmin; top: -24vmin; width: 48vmin; height: 48vmin; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 252, 240, .95) 0 4%, rgba(255, 226, 160, .6) 12%, rgba(255, 179, 71, .2) 34%, rgba(255, 179, 71, 0) 68%);
+}
+
+/* fizzy bubbles behind the cards */
+.ft-fizz { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+.ft-bubble {
+  position: absolute; left: 0; top: 0; width: var(--s, 8px); height: var(--s, 8px);
+  margin: calc(var(--s, 8px) / -2) 0 0 calc(var(--s, 8px) / -2); will-change: transform, opacity;
+}
+.ft-bubble b {
+  display: block; width: 100%; height: 100%; border-radius: 50%;
+  border: 1.25px solid rgba(255, 236, 190, .92);
+  background: radial-gradient(circle at 33% 29%, rgba(255, 255, 248, 1) 0 14%, rgba(255, 238, 196, .34) 27%, rgba(244, 196, 99, .1) 56%, rgba(255, 214, 140, .42) 100%);
+  box-shadow: 0 0 10px 1px rgba(255, 196, 110, .55), inset 0 0 4px rgba(255, 240, 200, .6);
+}
+.ft-fizz.is-on .ft-bubble b { animation: ft-wobble var(--w, 1.1s) ease-in-out infinite alternate; }
+@keyframes ft-wobble { from { transform: translateX(calc(var(--s, 8px) * -.4)); } to { transform: translateX(calc(var(--s, 8px) * .4)); } }
+
+/* the trail: the ribbon canvas, the memory lights, the last point */
+.ft-trail { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.ft-path { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ft-path path { fill: none; stroke: #f4c463; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 4px rgba(255, 196, 110, .8)); }
+
+.ft-mem {
+  position: absolute; left: 0; top: 0; z-index: 1; width: var(--m, 30px); height: var(--m, 30px);
+  margin: calc(var(--m, 30px) / -2) 0 0 calc(var(--m, 30px) / -2); will-change: transform, opacity;
+}
+.ft-mem > i { position: absolute; inset: 0; border-radius: 50%; }
+.ft-mem .ft-mem-halo {
+  inset: -110%; opacity: 0;
+  background: radial-gradient(circle, rgba(255, 222, 156, .62) 0%, rgba(255, 179, 71, .2) 34%, rgba(255, 179, 71, 0) 66%);
+}
+.ft-mem .ft-mem-disc {
+  background: radial-gradient(circle at 40% 34%, #432066 0%, #241038 62%, #170a26 100%);
+  box-shadow: 0 0 0 1px rgba(244, 196, 99, .62), 0 0 10px 1px rgba(255, 190, 110, .28), inset 0 0 6px rgba(255, 200, 120, .12);
+}
+.ft-mem .ft-mem-lit {
+  opacity: 0;
+  background: radial-gradient(circle at 38% 32%, #fffbea 0%, #ffe6ab 30%, #f4c463 64%, #c98f2b 100%);
+  box-shadow: 0 0 0 1px rgba(255, 244, 214, .95), 0 0 16px 4px rgba(255, 204, 120, .6);
+}
+.ft-mem .mem-glyph { position: absolute; left: 18%; top: 18%; width: 64%; height: 64%; overflow: visible; }
+.ft-mem .g-dim { color: #f4c463; }
+.ft-mem .g-lit { color: #5a2c14; opacity: 0; }
+
+.ft-runner { position: absolute; left: 0; top: 0; z-index: 2; width: 0; height: 0; pointer-events: none; will-change: transform, opacity; }
+.ft-runner::before {
+  content: ''; position: absolute; left: -54px; top: -54px; width: 108px; height: 108px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 253, 244, 1) 0 5%, rgba(255, 230, 168, .75) 12%, rgba(255, 186, 96, .24) 32%, rgba(255, 179, 71, 0) 66%);
+}
+
+.ft-light {
+  position: absolute; left: 0; top: 0; z-index: 3; width: 64px; height: 64px; margin: -32px 0 0 -32px;
+  padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; pointer-events: auto;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none;
+}
+.ft-light:disabled { cursor: default; }
+.ft-light:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 5px; border-radius: 50%; box-shadow: 0 0 0 7px rgba(255, 227, 163, .16); }
+.ft-light > span { position: absolute; border-radius: 50%; pointer-events: none; will-change: transform, opacity; }
+.ft-light-halo {
+  inset: -85%;
+  background: radial-gradient(circle, rgba(255, 232, 176, .62) 0%, rgba(255, 186, 96, .22) 30%, rgba(255, 179, 71, 0) 64%);
+}
+.ft-light-sun { inset: -13px; }
+.ft-light-sun .sun-emblem { display: block; width: 100%; height: 100%; will-change: transform; }
+.ft-light-ring { inset: 15%; border: 1px solid rgba(255, 227, 163, .6); box-shadow: 0 0 10px rgba(255, 200, 110, .35), inset 0 0 8px rgba(255, 200, 110, .2); }
+.ft-light-core {
+  inset: 31%;
+  background: radial-gradient(circle, #fffef8 0%, #fff1c9 30%, #f4c463 66%, rgba(244, 196, 99, 0) 100%);
+  box-shadow: 0 0 16px 5px rgba(255, 214, 140, .55);
+}
+.ft-light.is-lit .ft-light-ring { border-color: rgba(255, 240, 200, .9); }
+
+.ft-hint {
+  position: absolute; left: 0; top: 0; z-index: 3; margin: 0; white-space: nowrap; pointer-events: none;
+  font-family: var(--f-caps); font-size: clamp(11px, .85vw, 13px); letter-spacing: .3em; text-transform: uppercase; color: var(--gold-hi);
+  text-shadow: 0 0 12px rgba(255, 190, 110, .55), 0 2px 8px rgba(0, 0, 0, .85);
+}
+
+/* the two cards: side by side, shoulder to shoulder, both turned toward the trail's end */
+.ft-stage { position: absolute; left: 0; right: 0; top: 40%; z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 18px; pointer-events: none; }
+.ft-pair { position: relative; display: flex; align-items: flex-end; justify-content: center; gap: var(--gap, 12px); }
+.ft-pair::before {
+  content: ''; position: absolute; left: -32%; right: -32%; top: -28%; bottom: -40%; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255, 204, 128, .3), rgba(255, 170, 90, .1) 46%, rgba(255, 170, 90, 0) 72%);
+  transition: opacity 2.6s var(--ease-in-out);
+}
+.ft-pair.is-lit::before { opacity: 1; }
+.ft-slot { position: relative; width: var(--cw, 160px); will-change: transform, opacity; }
+.ft-card {
+  margin: 0; width: 100%;
+  transform: perspective(1000px) rotateY(13deg) rotateX(3deg);
+  transform-origin: 50% 100%;
+}
+.ft-card .ph { aspect-ratio: var(--ph-ratio, 1); }
+.ft-card .cap { font-size: var(--cap, 20px); padding: 6% 4% 8%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ft-develop { position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, #f6efe0, #e9dcc4); pointer-events: none; }
+
+/* the best friend's card: cream paper, a drawing of a keyring */
+.ft-me:not(.is-photo) { background: linear-gradient(172deg, #fff9ec 0%, #fbf0da 60%, #f4e4c4 100%); }
+.ft-me .cap { color: var(--ink); }
+.ft-sketch {
+  background-color: #fff6e6;
+  background-image: radial-gradient(rgba(58, 33, 71, .05) .7px, transparent 1px);
+  background-size: 6px 6px;
+}
+.ft-sketch .keyring-sketch { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* a warm light that passes over the cards once */
+.ft-gloss { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; border-radius: 3px; }
+.ft-sheen {
+  position: absolute; inset: 0; opacity: 0; will-change: transform, opacity;
+  background: linear-gradient(105deg, rgba(255, 236, 190, 0) 30%, rgba(255, 242, 210, .34) 50%, rgba(255, 236, 190, 0) 70%);
+}
+
+/* each card's keychain charm, hanging from its lower outer corner */
+.ft-eyelet {
+  position: absolute; bottom: 5px; z-index: 2; width: 7px; height: 7px; border-radius: 50%;
+  background: radial-gradient(circle, #2a1442 0 34%, #ffe3a3 40%, #c98f2b 74%, #8a5a1c 100%);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .3);
+}
+.ft-charm {
+  position: absolute; z-index: 3; top: calc(100% - 9px); display: block; pointer-events: none;
+  width: calc(var(--cw, 160px) * .165); aspect-ratio: 40 / 76; transform-origin: 50% 6%; will-change: transform;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .45));
+}
+.ft-charm .charm-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ft-her .ft-charm { left: calc(5% + var(--cw, 160px) * -.005); }
+.ft-her .ft-eyelet { left: calc(5% + var(--cw, 160px) * .0775 - 3.5px); }
+.ft-me .ft-charm { right: calc(5% + var(--cw, 160px) * -.005); }
+.ft-me .ft-eyelet { right: calc(5% + var(--cw, 160px) * .0775 - 3.5px); }
+.ft-charm .charm-glow { opacity: .35; transition: opacity 1.6s ease; }
+.ft-pair.is-lit .ft-charm .charm-glow { opacity: .9; }
+
+.ft-reply { pointer-events: auto; text-decoration: none; white-space: nowrap; }
+
+.reduced-motion .ft-fizz.is-on .ft-bubble b { animation: none; }

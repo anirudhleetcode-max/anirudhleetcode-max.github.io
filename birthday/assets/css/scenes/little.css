@@ -1,0 +1,6 @@
+/* ---------- "The Little Things" (scenes/little.js): one WebGL canvas and a veil for the cuts ---------- */
+.scene-little { background: #05040c; }
+.lth-root { position: absolute; inset: 0; overflow: hidden; }
+.lth-gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; }
+.lth-veil { position: absolute; inset: 0; background: #05040c; opacity: 1; pointer-events: none; }
+.scene-favourites { background: #05040c; }

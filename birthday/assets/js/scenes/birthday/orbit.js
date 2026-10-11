@@ -1,0 +1,160 @@
+// The last beat of the birthday chapter: her chosen photographs come back and drift
+// in a slow, soft swirl around the title — up to three tilted rings, depth-sorted
+// (the near side passes below the title, larger and brighter; the far side above,
+// smaller and dimmer). Photos fade whenever they would cross the words on screen,
+// so the title and the final lines always stay clean. Plain DOM (crisp photos,
+// object-position focal points, alt text); one transform + opacity write per frame.
+import { TAU, clamp, lerp, sstep } from './util.js';
+
+// a photograph's scale on the far pass (above the title) and the near pass (below it)
+const FAR = 0.58;
+const NEAR = 1.08;
+
+const RINGS = {
+  // on a phone the title is nearly as wide as the screen: the rings are wider than the
+  // frame, so photos pass above and below it and swing out past the edges at the sides
+  portrait: [
+    { rx: 0.52, ry: 0.235, size: 0.86, speed: 1 },
+    { rx: 0.64, ry: 0.305, size: 1, speed: 0.74 },
+    { rx: 0.76, ry: 0.375, size: 1.1, speed: 0.56 },
+  ],
+  landscape: [
+    { rx: 0.25, ry: 0.255, size: 0.84, speed: 1 },
+    { rx: 0.35, ry: 0.35, size: 1, speed: 0.74 },
+    { rx: 0.45, ry: 0.44, size: 1.1, speed: 0.56 },
+  ],
+};
+
+/**
+ * createOrbit(container, photos, { device }) →
+ *   { layout({ W, H, cx, cy }), update(time, dt), show({ stagger }), set({ alpha, spread, speed }), zones(rects), destroy() }
+ */
+export function createOrbit(container, photos, { device = {} } = {}) {
+  const reduced = !!device.reducedMotion;
+  const ringCount = photos.length <= 9 ? 1 : photos.length <= 22 ? 2 : 3;
+  const items = photos.map((photo, i) => {
+    const fig = document.createElement('figure');
+    fig.className = 'bd-ph';
+    const img = document.createElement('img');
+    img.alt = photo.alt || photo.caption || photo.label || 'A photograph of her';
+    img.decoding = 'async';
+    img.draggable = false;
+    img.src = photo.thumbUrl || photo.url;
+    img.style.objectPosition = photo.objectPosition || '50% 40%';
+    fig.appendChild(img);
+    container.appendChild(fig);
+    return { photo, fig, ring: i % ringCount, k: 0, ratio: clamp(Number(photo.ratio) || 1, 0.55, 1.8), appear: 0, w: 0, h: 0, theta: 0, last: '' };
+  });
+  // spread each ring's photos evenly around it, rings offset from each other
+  for (let r = 0; r < ringCount; r++) {
+    const ring = items.filter((it) => it.ring === r);
+    ring.forEach((it, k) => { it.theta = (k / ring.length) * TAU + r * 0.9 + 0.35; });
+  }
+
+  const st = { W: 0, H: 0, cx: 0, cy: 0, alpha: 1, spread: 1, speed: 1, rings: RINGS.portrait, base: 80, zones: [], phase: 0 };
+
+  /** `clear` = half the size of the title block (px): the rings pass above and below it. */
+  function layout({ W, H, cx, cy, clear = null }) {
+    st.W = W;
+    st.H = H;
+    st.cx = cx;
+    st.cy = cy;
+    const portrait = H >= W * 1.05;
+    // a photo about a fifth of the short side (smaller when there are many)
+    const crowd = items.length > 24 ? 0.86 : items.length > 14 ? 0.93 : 1;
+    st.base = clamp(Math.min(W, H) * (portrait ? 0.215 : 0.135) * crowd, 58, 150);
+    st.rings = (portrait ? RINGS.portrait : RINGS.landscape).map((R, k) => {
+      if (!clear) return R;
+      // tall titles (tablets): open the rings up so the near and far passes clear it
+      const half = (st.base * R.size) / 2;
+      const need = (clear.hh + half * 1.08 + 10) / H + k * 0.06;
+      return { ...R, ry: clamp(Math.max(R.ry, need), R.ry, 0.47) };
+    });
+    for (const it of items) {
+      const s = st.base * st.rings[it.ring].size;
+      it.w = Math.round(s * Math.sqrt(it.ratio));
+      it.h = Math.round(s / Math.sqrt(it.ratio));
+      it.fig.style.width = `${it.w}px`;
+      it.fig.style.height = `${it.h}px`;
+      it.fig.style.marginLeft = `${-it.w / 2}px`;
+      it.fig.style.marginTop = `${-it.h / 2}px`;
+    }
+    // The whole turn stays inside the frame. On wide screens the title sits high, and the far
+    // half of a ring (above it) used to rise past the top edge. Like a ring seen in perspective,
+    // each half gets its own height: the far half rises only to a top safe area (clear of the
+    // progress dots), the near half sinks only to a bottom one; a half that already fits keeps
+    // its designed height. update() blends the halves smoothly (no kink at the sides).
+    const margin = Math.max(28, H * 0.04);
+    st.rings = st.rings.map((R, k) => {
+      const tallest = Math.max(0, ...items.filter((it) => it.ring === k).map((it) => it.h));
+      const ryDown = clamp(Math.min(R.ry, (H - cy - (tallest * NEAR) / 2 - margin) / H), R.ry * 0.5, R.ry);
+      const ryUp = clamp(Math.min(R.ry, (cy - (tallest * FAR) / 2 - margin) / H), ryDown * 0.5, R.ry);
+      // y = cy + (ryMid·d + ryBend·d²)·H for depth d ∈ [-1, 1]: −ryUp at the top, +ryDown at the
+      // bottom, monotonic and smooth in between (ryUp ≥ ryDown / 2 keeps it monotonic)
+      return { ...R, ryUp, ryDown, ryMid: (ryUp + ryDown) / 2, ryBend: (ryDown - ryUp) / 2 };
+    });
+  }
+
+  /** Screen rects ({x0, y0, x1, y1}) the photos must not cover. */
+  function zones(rects) { st.zones = (rects || []).filter(Boolean); }
+
+  function maskAt(x, y, hw, hh) {
+    let m = 1;
+    for (const z of st.zones) {
+      const dx = Math.max(z.x0 - (x + hw), (x - hw) - z.x1, 0);
+      const dy = Math.max(z.y0 - (y + hh), (y - hh) - z.y1, 0);
+      const d = Math.hypot(dx, dy);
+      m = Math.min(m, lerp(z.floor ?? 0.1, 1, sstep(0, 34, d)));
+    }
+    return m;
+  }
+
+  const omega = (TAU / 92) * (reduced ? 0.25 : 1);
+  function update(time, dt) {
+    st.phase += dt * omega * st.speed;
+    for (const it of items) {
+      const R = st.rings[it.ring];
+      const th = it.theta + st.phase * R.speed;
+      const depth = Math.sin(th); // +1 near (below the title), -1 far (above it)
+      const near = (depth + 1) / 2;
+      const sp = st.spread * lerp(0.9, 1, it.appear);
+      const x = st.cx + Math.cos(th) * R.rx * st.W * sp;
+      const y = st.cy + ((R.ryMid ?? R.ry) * depth + (R.ryBend ?? 0) * depth * depth) * st.H * sp;
+      const s = lerp(FAR, NEAR, near) * lerp(0.55, 1, it.appear);
+      // (layout() keeps the turn inside the frame; on a frame too small for that, a photo still
+      // fades out softly before the top or bottom edge could cut it flat. The side swings past
+      // the frame on phones are intended.)
+      const hh = (it.h * s) / 2;
+      const edge = Math.min(y - hh, st.H - (y + hh));
+      const a = lerp(0.6, 1, near) * maskAt(x, y, (it.w * s) / 2, hh) * sstep(-hh * 0.5, 28, edge) * st.alpha * it.appear;
+      it.fig.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) scale(${s.toFixed(3)})`;
+      it.fig.style.opacity = a.toFixed(3);
+      const z = String(100 + Math.round(depth * 60));
+      if (z !== it.last) { it.fig.style.zIndex = z; it.last = z; }
+      it.fig.style.visibility = a < 0.004 ? 'hidden' : 'visible';
+    }
+  }
+
+  /** Bring them back one by one (front ones first). */
+  /** Reveal the photographs in film order. `slowing`: quick at first, the last ones take their time. */
+  function show({ stagger = 0.09, duration = 1.6, slowing = false } = {}) {
+    const g = window.gsap;
+    const n = items.length;
+    const span = stagger * Math.max(0, n - 1) * (slowing ? 1.6 : 1);
+    const at = (k) => (reduced ? k * stagger * 0.5 : slowing ? span * (k / Math.max(1, n - 1)) ** 1.6 : k * stagger);
+    items.forEach((it, k) => g.to(it, { appear: 1, duration: reduced ? 1.2 : duration * (slowing ? 1 + k / Math.max(1, n - 1) : 1), delay: at(k), ease: 'power2.out' }));
+    return at(n - 1) + duration * (slowing ? 2 : 1);
+  }
+
+  function set(o = {}) {
+    for (const k of ['alpha', 'spread', 'speed']) if (o[k] != null) st[k] = o[k];
+  }
+
+  function destroy() {
+    const g = window.gsap;
+    for (const it of items) { g.killTweensOf(it); it.fig.remove(); }
+    items.length = 0;
+  }
+
+  return { layout, update, show, set, zones, destroy, state: st, get count() { return items.length; }, get arrived() { return items.every((it) => it.appear >= 1); } };
+}

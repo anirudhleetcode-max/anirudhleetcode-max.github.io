@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-yrJXfv1XeHqm4QOCTOyjNZ059M2Zk765gRKWA13MEAM='; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob: data:; font-src 'self'; connect-src 'self' blob: data:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#0b0614">
+  <meta name="robots" content="noindex, nofollow">
+  <title>For Deepu</title>
+  <meta name="description" content="A little birthday film for Deepu, from her best friend.">
+  <meta property="og:title" content="For you, Deepu ✨">
+  <meta property="og:description" content="Headphones on. Lights low. I made you something.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://anirudhleetcode-max.github.io/birthday/assets/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="https://anirudhleetcode-max.github.io/birthday/">
+  <meta property="og:site_name" content="For Deepu">
+  <meta property="og:image:alt" content="Thousands of lanterns rising over a lake at night, with the words: a little film for Deepu">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="For you, Deepu ✨">
+  <meta name="twitter:description" content="Headphones on. Lights low. I made you something.">
+  <meta name="twitter:image" content="https://anirudhleetcode-max.github.io/birthday/assets/og.jpg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="For Deepu">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
+  <link rel="stylesheet" href="assets/css/main.css">
+  <link rel="stylesheet" href="assets/css/scenes/shared.css">
+  <link rel="stylesheet" href="assets/css/scenes/invite.css">
+  <link rel="stylesheet" href="assets/css/scenes/prologue.css">
+  <link rel="stylesheet" href="assets/css/scenes/tower.css">
+  <link rel="stylesheet" href="assets/css/scenes/story.css">
+  <link rel="stylesheet" href="assets/css/scenes/hair.css">
+  <link rel="stylesheet" href="assets/css/scenes/names.css">
+  <link rel="stylesheet" href="assets/css/scenes/dance.css">
+  <link rel="stylesheet" href="assets/css/scenes/lanterns.css">
+  <link rel="stylesheet" href="assets/css/scenes/letter.css">
+  <link rel="stylesheet" href="assets/css/scenes/cake.css">
+  <link rel="stylesheet" href="assets/css/scenes/little.css">
+  <link rel="stylesheet" href="assets/css/scenes/video.css">
+  <link rel="stylesheet" href="assets/css/scenes/constellation.css">
+  <link rel="stylesheet" href="assets/css/scenes/birthday.css">
+  <link rel="stylesheet" href="assets/css/scenes/hug.css">
+  <link rel="stylesheet" href="assets/css/scenes/credits.css">
+  <link rel="stylesheet" href="assets/css/scenes/gallery.css">
+  <link rel="stylesheet" href="assets/css/scenes/transitions.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./assets/vendor/three/three.module.min.js",
+        "three/addons/": "./assets/vendor/three/addons/"
+      }
+    }
+  </script>
+  <script src="assets/vendor/gsap/gsap.min.js"></script>
+  <script src="assets/vendor/gsap/CustomEase.min.js"></script>
+  <script src="assets/vendor/gsap/DrawSVGPlugin.min.js"></script>
+  <script src="assets/vendor/gsap/MotionPathPlugin.min.js"></script>
+  <script src="assets/vendor/gsap/SplitText.min.js"></script>
+  <script src="assets/vendor/gsap/Physics2DPlugin.min.js"></script>
+</head>
+<body>
+  <!-- Film stage: every chapter is mounted into #stage -->
+  <main id="stage" aria-live="polite"></main>
+
+  <!-- Ambient layers (always on top of scenes, below UI) -->
+  <canvas id="dust" aria-hidden="true"></canvas>
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div id="grade" aria-hidden="true"></div>
+  <div id="grain" aria-hidden="true"></div>
+  <div id="letterbox" aria-hidden="true"><i class="lb-top"></i><i class="lb-bot"></i></div>
+  <div id="transition" aria-hidden="true"></div>
+
+  <!-- Cinematic UI -->
+  <div id="ui">
+    <div id="subtitles" aria-live="polite"></div>
+    <div id="chapter-card" aria-hidden="true"></div>
+    <button id="continue" type="button" hidden><span class="continue-label">Continue</span><span class="continue-orb" aria-hidden="true"></span></button>
+    <nav id="progress" aria-label="Chapters"></nav>
+    <button id="mute" type="button" aria-label="Mute music" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9v6h4l5 4V5L8 9H4z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M16 9l6 6M22 9l-6 6"/></svg>
+    </button>
+  </div>
+
+  <div id="boot" aria-hidden="true">
+    <div class="boot-sun"></div>
+    <p class="boot-text">gathering sunlight…</p>
+  </div>
+
+  <noscript><p class="noscript">This little film needs JavaScript turned on. ✨</p></noscript>
+  <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>
