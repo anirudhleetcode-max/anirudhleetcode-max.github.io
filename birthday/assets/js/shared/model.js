@@ -17,7 +17,7 @@ export const FANART_MAX = 2;
 
 /** Words that make a photo read as romantic (roses, hearts…): the friendship moments pass those photos over. */
 export const ROMANCE = /\b(roses?|hearts?|valentine|couple|kiss(es|ing)?|date night)\b/i;
-export const readsRomantic = (p) => !!p && ROMANCE.test(`${p.label || ''} ${p.alt || ''} ${p.caption || ''}`);
+export const readsRomantic = (p) => !!p && ROMANCE.test(`${p.label || ''} ${p.alt || ''} ${p.caption || ''} ${p.rawCaption || ''}`);
 
 /** Where photos can live in the film. Counts are flexible — chapters adapt. */
 export const PHOTO_CHAPTERS = [
@@ -247,13 +247,31 @@ const DEFAULT_SETTINGS = {
   theme: { grain: 0.6, particles: 1, ribbon: true, keychains: true, sprite: true, twinklingWatermelon: true, panipuri: true, manchuria: true, nivin: true },
 };
 
-/** Fill defaults, repair ids/orders. Never removes owner data. */
+/** The words that are lists of lines (Messages): a single string typed by hand is read as a one-line list. */
+export const LIST_FIELDS = {
+  invite: ['lines'], prologue: ['lines'], tower: ['lines'], story: ['memories'], hair: ['lines'], names: ['documentary', 'items'],
+  dance: ['lines'], lanterns: ['lines'], letter: ['body'], cake: ['lines'], little: ['keychainLines', 'spriteLines', 'nightLines'],
+  favourites: ['panipuriLines', 'manchuriaLines', 'nivinIntro', 'nivinLines', 'nivinAfter', 'revealLines'], constellation: ['lines'],
+  birthday: ['lanterns', 'loved'], hug: ['intro', 'lines'], credits: ['roles', 'postCredits'],
+};
+// (these hold groups, not lines: a stray string there is reported, never turned into one)
+const OBJECT_LISTS = new Set(['story.memories', 'names.items', 'credits.roles']);
+const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/** Fill defaults, repair ids/orders. Never removes owner data: a part with the wrong shape (typed by hand)
+ *  is noted in `site.malformed` — read fresh on every normalize, and never written to any file (it is not
+ *  enumerable) — so validate() blocks publishing, the admin refuses to publish over it, and the film plays
+ *  on without that part rather than freezing. */
 export function normalize(site) {
   const s = site || {};
+  const bad = new Set();
+  const part = (v, name) => { if (v != null && !isObj(v)) { bad.add(name); return {}; } return v || {}; };
   s.version = MODEL_VERSION;
-  s.her = { name: 'Deepu', nicknames: ['Deepu', 'Kuchu Puchu'], birthDate: '2007-01-03', ...(s.her || {}) };
-  s.from = { name: 'Your best friend', signoff: 'Your best friend, always', ...(s.from || {}) };
-  const st = s.settings || {};
+  s.her = { name: 'Deepu', nicknames: ['Deepu', 'Kuchu Puchu'], birthDate: '2007-01-03', ...part(s.her, 'her') };
+  if (typeof s.her.nicknames === 'string') s.her.nicknames = [s.her.nicknames];
+  if (!Array.isArray(s.her.nicknames)) { if (s.her.nicknames != null) bad.add('her.nicknames'); s.her.nicknames = []; }
+  s.from = { name: 'Your best friend', signoff: 'Your best friend, always', ...part(s.from, 'from') };
+  const st = part(s.settings, 'settings');
   s.settings = {
     ...DEFAULT_SETTINGS,
     ...st,
@@ -262,15 +280,23 @@ export function normalize(site) {
     github: { ...DEFAULT_SETTINGS.github, ...(st.github || {}) },
     theme: { ...DEFAULT_SETTINGS.theme, ...(st.theme || {}) },
   };
-  s.media = { music: null, musicTitle: '', video: null, videoCaption: 'A little something I recorded for you', voice: null, ...(s.media || {}) };
-  const enabled = new Map((s.chapters || []).map((c) => [c.id, c.enabled !== false]));
+  s.media = { music: null, musicTitle: '', video: null, videoCaption: 'A little something I recorded for you', voice: null, ...part(s.media, 'media') };
+  if (s.chapters != null && (!Array.isArray(s.chapters) || s.chapters.some((c) => !isObj(c)))) bad.add('chapters');
+  const enabled = new Map((Array.isArray(s.chapters) ? s.chapters : []).filter(isObj).map((c) => [c.id, c.enabled !== false]));
   s.chapters = FILM_CHAPTERS.map((c) => ({ id: c.id, enabled: c.toggle === false ? true : enabled.has(c.id) ? enabled.get(c.id) : true }));
-  s.text = s.text || {};
-  s.photoChapters = s.photoChapters || {};
+  s.text = part(s.text, 'messages');
+  for (const [group, fields] of Object.entries(LIST_FIELDS)) {
+    const g = s.text[group];
+    if (!isObj(g)) continue;
+    for (const f of fields) if (typeof g[f] === 'string' && !OBJECT_LISTS.has(`${group}.${f}`)) g[f] = [g[f]];
+  }
+  s.photoChapters = part(s.photoChapters, 'photos.chapters');
   s.settingsExtra = s.settingsExtra || {};
   s.photosExtra = s.photosExtra || {};
+  if (s.photos != null && !Array.isArray(s.photos)) { bad.add('photos'); s.photos = []; }
+  if ((s.photos || []).some((p) => !isObj(p))) bad.add('photos');
   const seen = new Set();
-  s.photos = (s.photos || []).map((p) => {
+  s.photos = (s.photos || []).filter(isObj).map((p) => {
     const q = newPhoto(p);
     while (seen.has(q.id)) q.id = newId(q.chapter);
     seen.add(q.id);
@@ -278,6 +304,7 @@ export function normalize(site) {
   });
   // stable 1..n order per chapter
   for (const ch of PHOTO_CHAPTERS) photosFor(s, ch.id, { includeDisabled: true }).forEach((p, i) => (p.order = i + 1));
+  Object.defineProperty(s, 'malformed', { value: [...bad], enumerable: false, configurable: true, writable: true });
   return s;
 }
 
@@ -312,6 +339,12 @@ export function upgrade(site) {
 }
 
 /* ------------------------------------------------------------------ checks */
+const PART = { her: 'settings.json → her', from: 'settings.json → from', settings: 'settings.json → settings', media: 'settings.json → media', chapters: 'settings.json → chapters (a list of chapters, each switched on or off)', messages: 'messages.json', 'her.nicknames': 'settings.json → her → nicknames (a list of names)', photos: 'photos.json → photos (a list of photos)', 'photos.chapters': 'photos.json → chapters' };
+/** Blocking errors for the parts normalize() found with the wrong shape (`site.malformed`). */
+export function malformedErrors(list) {
+  return (Array.isArray(list) ? list : []).map((m) => ({ message: `${PART[m] || m} has the wrong shape, so the film can't use it. Fix it in the file, or restore the last good version from the repository history.` }));
+}
+
 /**
  * Problems the owner should know about before publishing.
  * errors block publishing; warnings are friendly reminders.
@@ -319,6 +352,18 @@ export function upgrade(site) {
 export function validate(site) {
   const errors = [];
   const warnings = [];
+  // the wrong kind of content (typed by hand into the JSON files): the film would skip or misread it
+  errors.push(...malformedErrors(site.malformed));
+  if (site.her && Array.isArray(site.her.nicknames) && site.her.nicknames.some((n) => typeof n !== 'string')) errors.push({ message: 'Her nicknames must all be text (settings.json → her → nicknames).' });
+  for (const [group, value] of Object.entries(site.text || {})) {
+    if (group === 'version') continue;
+    if (!isObj(value)) { errors.push({ group, message: `Messages → ${group} has the wrong shape (it should be a group of fields), so the film can't use it.` }); continue; }
+    for (const f of LIST_FIELDS[group] || []) {
+      const v = value[f];
+      if (v != null && !Array.isArray(v)) errors.push({ group, message: `Messages → ${group} → ${f} should be a list${OBJECT_LISTS.has(`${group}.${f}`) ? '' : ' (one line per item)'}, so the film can't use it.` });
+      else if (Array.isArray(v) && v.some((x) => (OBJECT_LISTS.has(`${group}.${f}`) ? x == null || typeof x !== 'object' : typeof x !== 'string'))) errors.push({ group, message: `Messages → ${group} → ${f} has an item of the wrong kind (${OBJECT_LISTS.has(`${group}.${f}`) ? 'each one should be a group of fields' : 'each line should be text'}).` });
+    }
+  }
   const ids = new Set();
   const CHAPTER_IDS = new Set(PHOTO_CHAPTERS.map((c) => c.id));
   const roles = {};

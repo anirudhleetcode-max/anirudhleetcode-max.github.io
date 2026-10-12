@@ -19,6 +19,9 @@
 // It never goes below minRatio: a ratio already at the floor cannot step, so a caller that wants a
 // 1× screen to have a fallback gives it a floor below 1 (the 3D chapters' high tier: 0.75).
 
+const PREWARM_LIMIT_MS = 8000;
+const contextLost = (renderer) => { try { const gl = renderer.getContext(); return !!(gl && gl.isContextLost && gl.isContextLost()); } catch { return false; } };
+
 export async function prewarm({ renderer, scene, camera, composer = null, show = [], signal = null } = {}) {
   const hidden = show.filter((o) => o && o.visible === false);
   hidden.forEach((o) => { o.visible = true; });
@@ -33,8 +36,21 @@ export async function prewarm({ renderer, scene, camera, composer = null, show =
     } finally {
       renderer.setRenderTarget(prev);
     }
-    if (pending) await pending;
-    if (signal && signal.aborted) return false;
+    // never wait forever: with a lost GPU context three.js's parallel compile polls a status that never
+    // comes, so the chapter would sit on its title card. After a while (or once the context is lost) it
+    // just carries on — the first frames then compile what is left, as they would without a warm-up.
+    if (pending) {
+      let timer = 0;
+      let poll = 0;
+      await Promise.race([
+        pending,
+        new Promise((r) => { timer = setTimeout(r, PREWARM_LIMIT_MS); }),
+        new Promise((r) => { poll = setInterval(() => { if (contextLost(renderer)) r(); }, 250); }),
+      ]).catch(() => {});
+      clearTimeout(timer);
+      clearInterval(poll);
+    }
+    if ((signal && signal.aborted) || contextLost(renderer)) return false;
     // one real frame through the real pipeline: textures, buffers, shadow maps, post passes — with
     // frustum culling off, so what the warm-up camera cannot see is uploaded too
     const culled = [];

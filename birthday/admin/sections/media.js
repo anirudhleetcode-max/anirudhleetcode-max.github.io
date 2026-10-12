@@ -85,6 +85,20 @@ function mediaCard(kind) {
       path ? h('button.btn.sm.quiet', { type: 'button', onclick: () => openPreview(cfg.scene) }, icon('eye'), 'Preview in the film') : null));
 }
 
+/** Does the file start like audio / video? (MP4 / M4A / MOV boxes, MP3 / AAC frames or an ID3 tag, WAV, Ogg, WebM, FLAC, AIFF) */
+export async function looksLike(file, kind) {
+  let b;
+  try { b = new Uint8Array(await file.slice(0, 16).arrayBuffer()); } catch { return false; }
+  if (b.length < 12) return false;
+  const at = (i, str) => [...str].every((c, k) => b[i + k] === c.charCodeAt(0));
+  const box = ['ftyp', 'moov', 'mdat', 'wide', 'free', 'skip', 'pnot'].some((t) => at(4, t)); // MP4 / M4A / MOV
+  const webm = b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3;
+  if (kind === 'video') return box || webm;
+  const frame = b[0] === 0xff && (b[1] & 0xe0) === 0xe0; // MP3 / AAC (ADTS)
+  const aiff = at(0, 'FORM') && (at(8, 'AIFF') || at(8, 'AIFC'));
+  return box || webm || frame || at(0, 'ID3') || (at(0, 'RIFF') && at(8, 'WAVE')) || at(0, 'OggS') || at(0, 'fLaC') || aiff;
+}
+
 export async function pickMedia(kind, file = null) {
   const cfg = MEDIA[kind];
   const f = file || (await pickFiles({ accept: cfg.accept }))[0];
@@ -106,6 +120,12 @@ export async function pickMedia(kind, file = null) {
   const kindOk = cfg.kind === 'video' ? /^video\//.test(f.type) || cfg.exts.includes(fromName) : /^audio\//.test(f.type) || cfg.exts.includes(fromName);
   if (!kindOk) {
     toast(`That doesn’t look like ${cfg.kind === 'video' ? 'a video' : 'an audio file'}. Please choose ${cfg.exts.slice(0, 3).join(' / ').toUpperCase()}.`, { type: 'error' });
+    return;
+  }
+  // the name can lie (a renamed text file): look at the file itself, so the film never gets a "voice note"
+  // that can't play
+  if (!(await looksLike(f, cfg.kind))) {
+    toast(`That file doesn’t look like a real ${cfg.kind === 'video' ? 'video' : 'audio file'} (it may be renamed or damaged). Please choose ${cfg.exts.slice(0, 3).join(' / ').toUpperCase()}.`, { type: 'error' });
     return;
   }
   const path = uniquePath(`media/${kind}-${stamp()}.${ext}`, takenPath);

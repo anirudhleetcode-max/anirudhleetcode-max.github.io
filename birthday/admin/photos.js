@@ -9,7 +9,7 @@
  *                               "Expected ratio: 4:5 · Uploaded ratio: 16:9" → CROP | CONTAIN | CHOOSE ANOTHER
  *                               (fan art: the new image is kept whole, in its own shape)
  *   fillEmptySpots()            placeholder records (src null) → focal-aware auto crops → review grid → Adjust
- *   deletePhoto(id)             with Undo
+ *   deletePhoto(id)             asks first; Undo, and Restore until the next publish
  *   movePhoto(id, chapter)      keeps its ratio, goes to the end of the new chapter (a memory link
  *                               only stays on photos in “How it began”); fan art never leaves Fan art
  *                               and a real photo never goes in (chapterChoices)
@@ -500,14 +500,27 @@ function detailsSheet({ index, total, chapter }) {
 }
 
 /* ---------------------------------------------------------------- delete / move / order */
-export function deletePhoto(id) {
+export async function deletePhoto(id) {
+  const p = state.site.photos.find((x) => x.id === id);
+  if (!p) return false;
+  // one tap never removes a photo: it asks, and says how it can come back
+  const published = (state.base?.photos || []).some((x) => x.id === id);
+  const name = p.label || 'this photo';
+  const sure = await confirmDialog({
+    kicker: 'Delete', title: 'Delete this photo?', danger: true, confirm: 'Delete', cancel: 'Keep it',
+    message: published
+      ? `“${name}” leaves the film when you next publish. Until then you can bring back its published version from the Photo library (Deleted photos); unpublished edits to it come back only with the Undo right after this. After publishing, its old version still stays in the repository’s history.`
+      : `“${name}” hasn’t been published yet, so only the Undo that appears right after this can bring it back.`,
+  });
+  if (!sure) return false;
   const i = state.site.photos.findIndex((x) => x.id === id);
-  if (i < 0) return;
+  if (i < 0) return false;
   const removed = clone(state.site.photos[i]);
   const blobs = ['src', 'thumb', 'original'].map((k) => [removed[k], state.files.get(removed[k])]).filter(([, b]) => b);
   change((site) => { site.photos.splice(i, 1); reorder(site, removed.chapter, []); });
   toast(`Deleted “${removed.label || 'photo'}”.`, {
     action: { label: 'Undo', run: () => {
+      if (state.site.photos.some((x) => x.id === removed.id)) return; // already brought back (Deleted photos → Restore)
       for (const [p, b] of blobs) stageFile(p, b);
       change((site) => {
         site.photos.splice(Math.min(i, site.photos.length), 0, removed);
@@ -518,6 +531,25 @@ export function deletePhoto(id) {
       toast('Restored.', { type: 'success' });
     } },
   });
+  return true;
+}
+
+/** Published photos this draft deletes (they can come back until the next publish). */
+export function deletedPublished() {
+  const ids = new Set((state.site?.photos || []).map((p) => p.id));
+  return (state.base?.photos || []).filter((p) => !ids.has(p.id));
+}
+/** Bring a deleted published photo back, in its old place, keeping every other draft change. */
+export function restorePhoto(id) {
+  const p = (state.base?.photos || []).find((x) => x.id === id);
+  if (!p || state.site.photos.some((x) => x.id === id)) return;
+  change((site) => {
+    site.photos.push(clone(p));
+    const ids = photosFor(site, p.chapter, { includeDisabled: true }).map((q) => q.id).filter((x) => x !== p.id);
+    ids.splice(Math.max(0, (p.order || 1) - 1), 0, p.id);
+    reorder(site, p.chapter, ids);
+  });
+  toast(`Restored “${p.label || 'photo'}”.`, { type: 'success' });
 }
 
 /** Fan art stays in Fan art; a real photo never goes there. */

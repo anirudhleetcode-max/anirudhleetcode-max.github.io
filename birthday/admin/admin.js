@@ -6,7 +6,7 @@
  * the URL hash. All state lives in state.js; photo work in photos.js / editor.js;
  * publishing, export and reset in publish.js.
  */
-import { upgrade } from '../assets/js/shared/model.js';
+import { upgrade, malformedErrors } from '../assets/js/shared/model.js';
 import {
   state, setHooks, changes, hasUnsavedDraft, flushSave, readDraft, clearDraft, fetchLocalSite, connectAndFetch,
   loadRepoCfg, lsGet, lsSet, loadToken, SECTION_KEY, DEFAULT_REPO, gcFiles,
@@ -23,8 +23,10 @@ import { renderTheme } from './sections/theme.js';
 import { renderPreview } from './sections/preview.js';
 import { renderSettings } from './sections/settings.js';
 import { renderHelp } from './sections/help.js';
+import { renderOverview } from './sections/overview.js';
 
 const SECTIONS = [
+  { id: 'overview', label: 'Overview', icon: 'grid', render: renderOverview },
   { id: 'library', label: 'Photo library', short: 'Photos', icon: 'images', render: renderLibrary, primary: true },
   { id: 'chapters', label: 'Chapters', icon: 'film', render: renderChapters, primary: true },
   { id: 'messages', label: 'Messages', icon: 'quote', render: renderMessages, primary: true },
@@ -296,6 +298,8 @@ async function boot() {
     renderFatal('Couldn’t load the site’s content (data/settings.json, messages.json, photos.json). Check your internet connection, or connect GitHub.');
     return;
   }
+  state.baseProblems = malformedErrors(base.malformed);
+  if (state.baseProblems.length) toast(`The site’s files need fixing before the next publish: ${state.baseProblems[0].message}`, { type: 'error' });
   state.base = upgrade(clone(base));
   state.site = clone(state.base);
   await restoreDraft();

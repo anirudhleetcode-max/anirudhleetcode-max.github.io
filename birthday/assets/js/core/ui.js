@@ -34,6 +34,15 @@ function splitWords(el, text) {
   return spans;
 }
 
+const CONTROL = 'button, a[href], input, select, textarea, summary, [role="button"], [contenteditable="true"]';
+/** A focused, visible, usable control other than Continue (a stale focus on a hidden or removed button doesn't count). */
+export function liveControl(el) {
+  const c = el && el.closest ? el.closest(CONTROL) : null;
+  if (!c || c.id === 'continue' || c.closest('#continue')) return null;
+  if (!c.isConnected || c.disabled || c.closest('[hidden], [inert]') || !c.getClientRects().length) return null;
+  return c;
+}
+
 export function createUI({ audio, reducedMotion }) {
   const subs = document.getElementById('subtitles');
   const card = document.getElementById('chapter-card');
@@ -139,18 +148,27 @@ export function createUI({ audio, reducedMotion }) {
     }
     const orn = html(flourishSVG());
     card.append(k, t, orn);
+    // the card itself is drawn letter by letter (hidden from screen readers): they hear the title once, whole
+    const sr = document.getElementById('sr-chapter');
+    if (sr) sr.textContent = [k.textContent, fill(String(title || ''))].map((x) => x.trim()).filter(Boolean).join(': ');
     g.set(card, { opacity: 1, visibility: 'visible' });
     audio && audio.sfx('shimmer');
     const paths = orn.querySelectorAll('path');
     const tl = g.timeline();
-    tl.fromTo(k, { opacity: 0, letterSpacing: '1.1em' }, { opacity: 1, letterSpacing: '.55em', duration: 1.6, ease: 'power3.out' }, 0)
-      .fromTo(chars, { opacity: 0, y: 24, filter: 'blur(12px)', scale: 1.15 }, { opacity: 1, y: 0, filter: 'blur(0px)', scale: 1, duration: 1.3, ease: 'power3.out', stagger: STAGGER.letters }, 0.25)
-      .fromTo(paths, { drawSVG: '50% 50%', opacity: 0 }, { drawSVG: '0% 100%', opacity: 1, duration: 1.6, ease: 'power2.inOut', stagger: 0.05 }, 0.7);
+    if (reducedMotion) {
+      // a calm card: the words simply fade in together, nothing grows, slides or blurs
+      tl.fromTo([k, ...chars], { opacity: 0 }, { opacity: 1, duration: 0.8, ease: 'power1.out' }, 0)
+        .fromTo(paths, { opacity: 0 }, { opacity: 1, duration: 0.8 }, 0.2);
+    } else {
+      tl.fromTo(k, { opacity: 0, letterSpacing: '1.1em' }, { opacity: 1, letterSpacing: '.55em', duration: 1.6, ease: 'power3.out' }, 0)
+        .fromTo(chars, { opacity: 0, y: 24, filter: 'blur(12px)', scale: 1.15 }, { opacity: 1, y: 0, filter: 'blur(0px)', scale: 1, duration: 1.3, ease: 'power3.out', stagger: STAGGER.letters }, 0.25)
+        .fromTo(paths, { drawSVG: '50% 50%', opacity: 0 }, { drawSVG: '0% 100%', opacity: 1, duration: 1.6, ease: 'power2.inOut', stagger: 0.05 }, 0.7);
+    }
     try {
       await abortable(tl.then(), s);
       if (onShown) onShown();
       await (until ? Promise.all([sleep(hold, s), abortable(Promise.resolve(until).catch(() => {}), s)]) : sleep(hold, s));
-      await abortable(new Promise((r) => g.to(card, { opacity: 0, filter: 'blur(6px)', duration: 1.1, ease: 'power2.in', onComplete: r })), s);
+      await abortable(new Promise((r) => g.to(card, reducedMotion ? { opacity: 0, duration: 0.7, onComplete: r } : { opacity: 0, filter: 'blur(6px)', duration: 1.1, ease: 'power2.in', onComplete: r })), s);
     } finally {
       g.set(card, { opacity: 0, visibility: 'hidden', filter: 'none' });
       card.innerHTML = '';
@@ -166,6 +184,11 @@ export function createUI({ audio, reducedMotion }) {
       setTimeout(() => {
         if (s && s.aborted) return;
         cont.hidden = false;
+        // keyboard and screen-reader users land on it, unless she is busy with another control
+        // (nor while she is in a region she scrolls by keyboard, like the letter)
+        const a = document.activeElement;
+        const reading = a && a.matches && a.matches('[role="region"][tabindex]') && a.isConnected && a.getClientRects().length;
+        if (!liveControl(a) && !reading && !document.querySelector('[aria-modal="true"]')) cont.focus({ preventScroll: true });
         g.fromTo(cont, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.9, ease: 'power3.out' });
         contResolve = () => {
           contResolve = null;
@@ -178,10 +201,14 @@ export function createUI({ audio, reducedMotion }) {
   }
   cont.addEventListener('click', () => contResolve && contResolve());
   window.addEventListener('keydown', (e) => {
-    if ((e.key === 'Enter' || e.key === 'ArrowRight' || e.key === ' ') && contResolve) {
-      e.preventDefault();
-      contResolve();
-    }
+    if (!contResolve || e.defaultPrevented || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key !== 'Enter' && e.key !== 'ArrowRight' && e.key !== ' ') return;
+    // a control she has focused (mute, the voice note, a chapter dot, a link…) keeps its own Enter / Space;
+    // → is only ever kept by a field she types or slides in
+    const c = liveControl(e.target);
+    if (c && (e.key !== 'ArrowRight' || c.matches('input, select, textarea, [contenteditable="true"]'))) return;
+    e.preventDefault();
+    contResolve();
   });
 
   function hint(text) {

@@ -259,6 +259,13 @@ export default {
     const greeting = words(ctx, t.greeting, 'Hey {name}.');
     const label = words(ctx, t.button, 'Light the lantern');
     const foot = words(ctx, t.foot, 'headphones on · lights low');
+    // a return visit (this browser): pick up where she left off, or, after the film, her photos and the chapters
+    const resume = ctx.resume;
+    const more = [
+      resume ? `<button type="button" class="inv-alt inv-resume">Continue from “${esc(resume.name)}”</button>` : '',
+      ctx.finished ? '<button type="button" class="inv-alt inv-album">Every photo</button>' : '',
+      ctx.finished || resume ? '<button type="button" class="inv-alt inv-chapters">Chapters</button>' : '',
+    ].join('');
 
     el.innerHTML = `
       <div class="inv-copy">
@@ -270,6 +277,7 @@ export default {
         <span class="inv-lantern"><span class="cam-wrap cam-layer" style="--depth:1.3">${lanternArt({ className: 'inv-lt' })}<i class="inv-ripple" aria-hidden="true"></i><i class="inv-ripple r2" aria-hidden="true"></i></span></span>
         <span class="inv-label">${esc(label)}</span>
       </button>
+      ${more ? `<div class="inv-more">${more}</div>` : ''}
       <p class="inv-foot">
         <svg class="inv-phones" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="6.5" rx="1.6"/><rect x="17" y="14" width="4" height="6.5" rx="1.6"/></svg>
         <span>${esc(foot)}</span>
@@ -285,6 +293,7 @@ export default {
     const lbl = el.querySelector('.inv-label');
     const ripples = el.querySelectorAll('.inv-ripple');
     const footEl = el.querySelector('.inv-foot');
+    const moreEl = el.querySelector('.inv-more');
     const refl = el.querySelector('.inv-refl');
     const warm = world.root.querySelector('.ns-warm');
     fx.dust({ density: 0.22, alpha: 0.7, speed: 0.6 });
@@ -310,7 +319,8 @@ export default {
       .fromTo(greet, { opacity: 0, filter: 'blur(14px)', y: reduced ? 0 : 14 }, { opacity: 1, filter: 'blur(0px)', y: 0, duration: 2 * D, ease: 'power3.out' }, 1.0 * D)
       .fromTo(ps, { opacity: 0, y: reduced ? 0 : 10, filter: 'blur(6px)' }, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 1.4 * D, stagger: 1.15 * D, ease: 'power2.out' }, 2.4 * D)
       .fromTo(lbl, { opacity: 0, y: reduced ? 0 : 8 }, { opacity: 1, y: 0, duration: 1.4 * D, ease: 'power2.out' }, `>-${0.2 * D}`)
-      .fromTo(footEl, { opacity: 0 }, { opacity: 0.62, duration: 1.4 * D }, '<0.6')
+      .fromTo(footEl, { opacity: 0 }, { opacity: 0.85, duration: 1.4 * D }, '<0.6')
+      .fromTo(moreEl ? [moreEl] : [], { opacity: 0 }, { opacity: 1, duration: 1.2 * D }, '<')
       .add(() => btn.classList.add('ready'), '<');
     if (!reduced) {
       this.sway = gsap.to(lanternBox, { rotation: 2.2, y: -7, duration: 3.6, yoyo: true, repeat: -1, ease: 'sine.inOut', transformOrigin: '50% 10%', delay: 3 });
@@ -329,9 +339,26 @@ export default {
         resolve();
       };
       btn.addEventListener('click', go);
+      // the return-visit choices ("Continue from …" is her first tap into the film, so it starts the sound;
+      // the album and the chapters list open over the invitation, which stays waiting behind them)
+      if (moreEl) {
+        moreEl.addEventListener('click', (e) => {
+          const b = e.target.closest('button');
+          if (!b || done || ctx.signal.aborted) return;
+          if (b.classList.contains('inv-resume')) {
+            done = true;
+            ctx.startSound();
+            ctx.immersive();
+            // if that chapter's code doesn't arrive, the invitation stays fully usable (the lantern too)
+            Promise.resolve(ctx.jump(resume.id)).then((went) => { if (went === false && !ctx.signal.aborted) done = false; });
+          } else if (b.classList.contains('inv-album')) ctx.openGallery({ only: 'all' });
+          else if (b.classList.contains('inv-chapters')) ctx.openChapters();
+        });
+      }
       const onKey = (e) => {
         if (e.repeat || !(e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar')) return;
-        if (document.activeElement === btn) return; // the button's own click handles it
+        // a focused button (the lantern, Continue from…, Every photo…) handles its own key
+        if (document.activeElement && document.activeElement.closest && document.activeElement.closest('button')) return;
         e.preventDefault();
         go();
       };
@@ -353,6 +380,7 @@ export default {
     fx.sparkle(cx, r0.top + r0.height * 0.86, reduced ? 10 : 22, { spread: 46 });
     gsap.to(refl, { opacity: 1, duration: 1.6, ease: 'power2.out' });
     gsap.to(warm, { opacity: 0.85, duration: 3, ease: 'sine.inOut' });
+    if (moreEl) moreEl.hidden = true;
     gsap.to([greet, ...ps, lbl, footEl], { opacity: 0, y: reduced ? 0 : -8, filter: 'blur(8px)', duration: 1.3, stagger: 0.06, ease: 'power2.in', delay: 0.5 });
     Promise.resolve(soundReady).then(() => {
       if (ctx.signal.aborted) return;

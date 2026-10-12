@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createLanternField, createPhotoLantern, createRibbon3D } from '../core/lanternfield.js';
+import { liveControl } from '../core/ui.js';
 
 const FALLBACK = {
   kicker: 'Chapter Six',
@@ -396,7 +397,8 @@ function createChapter(ctx, el) {
   el.innerHTML = `
     <canvas class="gl" aria-hidden="true"></canvas>
     <div class="ln-focus" aria-hidden="true"></div>
-    <figure class="ln-caption" aria-live="polite"><figcaption><span class="ln-cap-text"></span><span class="ln-cap-rule" aria-hidden="true"></span><span class="ln-cap-date"></span></figcaption></figure>
+    <p class="sr-only ln-sr" role="status"></p>
+    <figure class="ln-caption" aria-hidden="true"><figcaption><span class="ln-cap-text"></span><span class="ln-cap-rule" aria-hidden="true"></span><span class="ln-cap-date"></span></figcaption></figure>
     <div class="ln-veil" aria-hidden="true"></div>`;
   const canvas = el.querySelector('canvas');
   const veil = el.querySelector('.ln-veil');
@@ -404,6 +406,7 @@ function createChapter(ctx, el) {
   const capEl = el.querySelector('.ln-caption');
   const capText = el.querySelector('.ln-cap-text');
   const capDate = el.querySelector('.ln-cap-date');
+  const srEl = el.querySelector('.ln-sr'); // what a screen reader hears when a memory comes close
   const subsEl = document.getElementById('subtitles');
 
   /* ---------------- renderer, camera ---------------- */
@@ -747,6 +750,7 @@ function createChapter(ctx, el) {
     audio.duck(0.72, IN + HOLD);
     tweens.push(gsap.to(subsEl, { opacity: 0.1, duration: 0.6 }));
     signals.photo && signals.photo();
+    srEl.textContent = [s.photo.alt || 'A memory', ctx.fill(s.photo.caption || ''), ctx.fill(s.photo.date || '')].map((x) => String(x).trim()).filter(Boolean).join('. ');
     // a thread tied to this memory lets go rather than being dragged along
     ribbons.forEach((r) => { if (r.state !== 'fade' && r.chain.some((a) => a.s === s)) { r.state = 'fade'; r.ft = 0; } });
   }
@@ -756,6 +760,7 @@ function createChapter(ctx, el) {
     focus.phase = 'out';
     focus.t = 0;
     hideCaption();
+    srEl.textContent = '';
     audio.sfx('whoosh');
     tweens.push(gsap.to(subsEl, { opacity: 1, duration: 1.2, delay: 0.6 }));
   }
@@ -1078,6 +1083,7 @@ function createChapter(ctx, el) {
     const cont = document.getElementById('continue');
     if (e.key === 'Escape' && focus) { closeFocus(); return; }
     if ((e.key === 'Enter' || e.key === ' ') && (!cont || cont.hidden)) {
+      if (liveControl(e.target)) return; // a focused, visible control keeps its own key (a stale hidden one doesn't)
       if (focus) { closeFocus(); e.preventDefault(); return; }
       const s = plState
         .filter((q) => q.state === 'sky' && q.pl && q.pl.getOpacity() > 0.5)
@@ -1171,7 +1177,7 @@ function createChapter(ctx, el) {
     if (plState.length) {
       const visible = () => plState.some((s) => s.state === 'sky' && s.pl && s.pl.getOpacity() > 0.8);
       for (let n = 0; n < 40 && !visible(); n++) await ctx.wait(0.25);
-      if (!focus) {
+      if (!focus && visible()) {
         const hint = ui.hint(T.photoHint);
         await Promise.race([new Promise((r) => (signals.photo = r)), ctx.wait(8)]);
         hint.remove();

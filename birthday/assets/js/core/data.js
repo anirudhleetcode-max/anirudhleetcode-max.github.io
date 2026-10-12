@@ -15,10 +15,33 @@ async function loadDraftSafe() {
   }
 }
 
-async function fetchJSON(path) {
-  const res = await fetch(`${path}?v=${Date.now()}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`${path} ${res.status}`);
-  return res.json();
+/** One request that gives up after `timeout` ms (a hung connection never leaves her on the boot screen). */
+async function fetchOnce(path, timeout) {
+  const ac = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = ac ? setTimeout(() => ac.abort(), timeout) : 0;
+  try {
+    const res = await fetch(`${path}?v=${Date.now()}`, { cache: 'no-store', signal: ac ? ac.signal : undefined });
+    if (!res.ok) { const err = new Error(`${path} ${res.status}`); err.status = res.status; throw err; }
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** A content file, tried a few times (a dropped or slow request on mobile data is retried quietly).
+ *  A file that is simply not there (404) is not retried. */
+async function fetchJSON(path, { tries = 3, timeout = 9000 } = {}) {
+  let last = null;
+  for (let k = 0; k < tries; k++) {
+    try {
+      return await fetchOnce(path, timeout);
+    } catch (err) {
+      last = err;
+      if (err && err.status === 404) break;
+      if (k < tries - 1) await new Promise((r) => setTimeout(r, 600 * (k + 1)));
+    }
+  }
+  throw last;
 }
 
 export async function loadSite({ draft = false } = {}) {
@@ -36,8 +59,9 @@ export async function loadSite({ draft = false } = {}) {
       const [settings, messages, photos] = await Promise.all([fetchJSON(FILES.settings), fetchJSON(FILES.messages), fetchJSON(FILES.photos)]);
       site = combine({ settings, messages, photos });
     } catch (err) {
-      // an older deploy that still has the single-file format
-      site = upgrade(await fetchJSON(LEGACY_FILE));
+      // an older deploy that still has the single-file format (only when the files are really missing)
+      if (!(err && err.status === 404)) throw err;
+      site = upgrade(await fetchJSON(LEGACY_FILE, { tries: 1 }));
     }
   }
   return createStore(site, files);
@@ -62,6 +86,9 @@ export function createStore(site, files) {
   const chapterRank = ['prologue', 'tower', 'story', 'hair', 'names', 'dance', 'lanterns', 'letter', 'finale', 'album'];
   const indexOf = new Map(site.photos.map((p, i) => [p.id, i]));
 
+  // owner text on a photo goes through the same filler as narration ({name}… filled; a caption that still
+  // needs an unwritten memory, or holds a [PLACEHOLDER], is left out of her film)
+  let fillText = (t) => t;
   const toPhoto = (p) => {
     const ratio = parseRatio(p.ratio);
     const url = resolve(p.src);
@@ -74,9 +101,10 @@ export function createStore(site, files) {
       order: p.order,
       role: p.role,
       label: p.label || '',
-      caption: p.caption || '',
-      date: p.date || '',
-      alt: p.alt || p.caption || `A photo of ${herName}`,
+      caption: String(fillText(String(p.caption || '')) || '').trim(),
+      rawCaption: String(p.caption || ''), // as the owner typed it (tokens unfilled): what the tone guard reads
+      date: String(fillText(String(p.date || '')) || '').trim(),
+      alt: p.alt || String(fillText(String(p.caption || '')) || '').trim() || `A photo of ${herName}`,
       ratio,
       ratioStr: p.ratio,
       focal,
@@ -142,6 +170,8 @@ export function createStore(site, files) {
     count() { return this.real().length; },
     chapterEnabled(id) { return enabledChapter.has(id) ? enabledChapter.get(id) : true; },
     mediaUrl(key) { return resolve(site.media && site.media[key]); },
+    /** The projector's token filler (set once the tokens are known). */
+    setFill(fn) { fillText = typeof fn === 'function' ? fn : (t) => t; },
     daysAlive(when) { return daysAlive(site, when); },
   };
   return store;

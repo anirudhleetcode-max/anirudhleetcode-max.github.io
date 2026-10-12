@@ -951,17 +951,6 @@ const SFX = {
     return { out, end: t + dur + 1.5, cleanup: () => { try { wobble.disconnect(); } catch { /* gone */ } } };
   },
 
-  heartbeat(e, t, o) {
-    const out = fxOut(e, o, 0.08);
-    const thump = (at, a) => {
-      blip(e, out.input, at, 95, 48, 0.36 * a, 0.22, 'sine', 0.004);
-      blip(e, out.input, at, 190, 96, 0.1 * a, 0.12, 'triangle', 0.004);
-    };
-    thump(t, 1);
-    thump(t + 0.3, 0.72);
-    return { out, end: t + 1.2 };
-  },
-
   pageTurn(e, t, o) {
     const out = fxOut(e, o, 0.12);
     const { ctx } = e;

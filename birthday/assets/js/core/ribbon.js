@@ -1170,20 +1170,6 @@ export const ribbonPaths = {
     return reverse ? pts.reverse() : pts;
   },
 
-  /** A smooth heart, `size` px wide, starting and ending at the top dip (with a small overlap). */
-  heart(cx, cy, size, n = 56) {
-    const s = size / 32;
-    const pts = [];
-    const end = TAU + 0.42;
-    for (let i = 0; i <= n; i++) {
-      const t = 0.02 + (i / n) * end;
-      const x = 16 * Math.sin(t) ** 3;
-      const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
-      pts.push(P(cx + x * s, cy + (y - 2.7) * s));
-    }
-    return pts;
-  },
-
   /** A circle (or several slightly tightening loops when turns > 1), starting at the top. */
   circle(cx, cy, r, n = 48, turns = 1, start = -Math.PI / 2) {
     const pts = [];

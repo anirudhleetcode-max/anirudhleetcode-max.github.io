@@ -87,7 +87,15 @@ export function drawRegion(src, sx, sy, sw, sh, w, h) {
  * createImageBitmap(…, {imageOrientation:'from-image'}) applies EXIF orientation; the
  * <img> fallback does too (CSS image-orientation defaults to from-image).
  */
+/** Bigger than this, a photo isn't opened at all: decoding it whole could take the tab down on a phone. */
+export const MAX_PHOTO_BYTES = 60 * 1024 * 1024;
+
 export async function decodeImage(file, { maxSide = MAX_SOURCE } = {}) {
+  if (file && file.size > MAX_PHOTO_BYTES) {
+    const err = new Error(`That photo is ${Math.round(file.size / 1048576)} MB, too big to open safely here (the limit is ${MAX_PHOTO_BYTES / 1048576} MB). Export a smaller copy (a phone photo is usually 2–8 MB) and add that.`);
+    err.code = 'too-big';
+    throw err;
+  }
   let source = null;
   let sw = 0;
   let sh = 0;

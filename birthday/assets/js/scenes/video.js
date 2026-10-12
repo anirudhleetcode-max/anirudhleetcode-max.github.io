@@ -33,13 +33,27 @@ export default {
     audio.duck(0.04, 3600); // hold the music down while the video plays
     gsap.to(play, { opacity: 0, scale: 1.3, duration: 0.6, onComplete: () => (play.hidden = true) });
     video.controls = true;
-    try { await video.play(); } catch { /* user can press play */ }
-    await new Promise((resolve) => {
-      video.addEventListener('ended', resolve, { once: true });
-      // never get stuck: offer continue after a while either way
-      setTimeout(resolve, Math.max(20, (video.duration || 60) + 2) * 1000);
-    });
+    // a file this device can't play (or that didn't arrive) ends the wait at once, with one gentle line
+    let failed = !!video.error;
+    try { await video.play(); } catch (err) { if (err && err.name === 'NotSupportedError') failed = true; /* else: she can press play */ }
+    if (!failed) {
+      await new Promise((resolve) => {
+        video.addEventListener('ended', resolve, { once: true });
+        video.addEventListener('error', () => { failed = true; resolve(); }, { once: true });
+        if (video.error) { failed = true; resolve(); }
+        // never get stuck: offer continue after a while either way
+        setTimeout(resolve, Math.max(20, (video.duration || 60) + 2) * 1000);
+      });
+    }
     audio.duck(1, 0.1);
+    if (failed) {
+      video.hidden = true;
+      const note = document.createElement('p');
+      note.className = 'vd-note';
+      note.setAttribute('role', 'status');
+      note.textContent = 'The video couldn’t play on this device.';
+      frame.appendChild(note);
+    }
     await ui.waitContinue('Continue');
     ctx.next();
   },

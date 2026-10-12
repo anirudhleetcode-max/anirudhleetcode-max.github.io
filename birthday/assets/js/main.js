@@ -24,6 +24,22 @@ const PREVIEW = params.has('preview') || params.has('draft');
 const DRAFT = params.has('draft');
 const START_AT = params.get('scene');
 
+/* ---------------- her place in the film (this browser only) ----------------
+   Where she is and which chapters she has seen, so an accidental refresh, a closed in-app browser or a
+   return visit can pick up where she left off ("Continue from …" on the invitation) and the chapters she
+   has seen stay one tap away. A convenience, never needed: every read and write is guarded. Preview
+   links (the owner testing) keep their own key, so testing never touches her real place.            */
+const PLACE_KEY = PREVIEW ? 'deepu-film-place-preview' : 'deepu-film-place';
+function readPlace() {
+  try {
+    const v = JSON.parse(localStorage.getItem(PLACE_KEY) || 'null');
+    return v && v.v === 1 && typeof v.id === 'string' ? v : null;
+  } catch { return null; }
+}
+function writePlace(v) {
+  try { localStorage.setItem(PLACE_KEY, JSON.stringify({ v: 1, ...v, t: Date.now() })); } catch { /* storage unavailable */ }
+}
+
 const gsap = window.gsap;
 gsap.registerPlugin(CustomEase, DrawSVGPlugin, MotionPathPlugin, SplitText, Physics2DPlugin);
 CustomEase.create('film', '0.65,0,0.35,1');
@@ -138,6 +154,14 @@ const app = {
   lbTarget: '0px',
   curtainClosed: false,
   handoff: null,
+  /** she reached the credits once (the invitation then offers her photos and the chapters) */
+  finished: false,
+  /** where she left off on an earlier visit: { id, name } (offered on the invitation) */
+  resume: null,
+  /** a chapter change asked for while another was still under way (it runs right after) */
+  queued: null,
+  /** an open overlay (the album, the chapters) that the browser's Back closes first */
+  overlay: null,
 };
 
 function letterbox(on) {
@@ -182,7 +206,8 @@ function buildProgress() {
     b.setAttribute('aria-label', chapterName(def));
     b.title = chapterName(def);
     b.disabled = true;
-    b.addEventListener('click', () => {
+    b.addEventListener('click', (e) => {
+      if (e.detail > 0) b.blur(); // a mouse press leaves no focus behind (Enter still means Continue)
       if (!b.disabled && i !== app.index && !app.busy) goTo(i);
     });
     nav.appendChild(b);
@@ -249,27 +274,56 @@ function makeCtx(def, ac, incoming) {
       if (info) ctx.handoff(info);
       goTo(app.index + 1);
     },
-    restart() { goTo(app.list.findIndex((c) => c.id === 'prologue')); },
+    /** Watch again: back to the first chapter after the invitation (whatever the owner switched on). */
+    restart() {
+      app.handoff = null;
+      const i = app.list.findIndex((c, k) => k > 0 && c.nav !== false);
+      if (i > 0) goTo(i);
+    },
+    /** Go to a chapter by id (the invitation's "Continue from …", the chapters list). */
+    jump(id) {
+      const i = app.list.findIndex((c) => c.id === id);
+      if (i < 0 || i === app.index) return Promise.resolve(false);
+      app.handoff = null;
+      return goTo(i);
+    },
+    /** { id, name } of the chapter she left off at on an earlier visit, or null. */
+    get resume() { return app.resume; },
+    /** She has reached the end before (on this device). */
+    get finished() { return app.finished; },
+    openChapters: () => openChapters(),
     immersive: requestImmersive,
     startSound: () => app.startSound(),
   };
-  ctx.openGallery = async (opts) => (await import('./scenes/gallery.js')).openGallery(ctx, opts);
+  ctx.openGallery = async (opts) => {
+    const mod = await import('./scenes/gallery.js');
+    const g = mod.openGallery(ctx, { ...opts, onClose: () => overlayClosed('album') });
+    overlayOpened('album', () => g.close({ fromHistory: true }));
+    return g;
+  };
   return ctx;
 }
 
-async function goTo(index, { instant = false } = {}) {
-  if (index < 0 || index >= app.list.length || app.busy) return;
+/** Go to a chapter. Resolves true once it is in, false when its code didn't arrive, undefined when queued.
+ *  fromHistory: the browser's Back / Forward already moved to that chapter's entry (nothing is pushed). */
+async function goTo(index, { instant = false, fromHistory = false } = {}) {
+  if (index < 0 || index >= app.list.length) return false;
+  // a change asked for mid-transition (a quick tap, the safety net's Continue, the browser's Back) is
+  // kept and runs as soon as this one has finished, instead of being dropped
+  if (app.busy) { app.queued = { index, instant, fromHistory }; return undefined; }
   app.busy = true;
   const def = app.list[index];
   let mod;
   try {
-    mod = (await def.load()).default;
+    mod = (await loadChapter(def)).default;
   } catch (err) {
     console.error(`[scene] failed to load ${def.id}`, err);
     app.busy = false;
-    if (index + 1 < app.list.length) return goTo(index + 1, { instant });
-    return;
+    app.queued = null;
+    loadFailed(index, { instant });
+    return false;
   }
+  app.loadTries = 0;
 
   const handoff = app.handoff;
   app.handoff = null;
@@ -305,7 +359,9 @@ async function goTo(index, { instant = false } = {}) {
     app.current = { def, mod, el, ac, ctx, cam };
     app.index = index;
     app.seen.add(index);
+    if (def.id === 'credits') app.finished = true;
     updateProgress();
+    rememberPlace(def, { fromHistory });
     Promise.resolve()
       .then(() => mod.enter(ctx, el))
       .catch(async (err) => {
@@ -318,6 +374,7 @@ async function goTo(index, { instant = false } = {}) {
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     await sleep(0.25);
     preloadChapter(app.list[index + 1]);
+    prefetchCode(app.list[index + 1]);
   };
 
   // the owner can switch the decorative golden ribbon off (admin → Theme)
@@ -335,6 +392,148 @@ async function goTo(index, { instant = false } = {}) {
     onRevealed();
   }
   app.busy = false;
+  const q = app.queued;
+  app.queued = null;
+  if (q && q.index !== app.index) goTo(q.index, { instant: q.instant, fromHistory: q.fromHistory });
+  return true;
+}
+
+/** A chapter's code. A dropped download is tried once more at a fresh address (a browser remembers a
+ *  failed module for the page's lifetime, so asking for the same address again would fail at once). */
+async function loadChapter(def) {
+  try {
+    return await def.load();
+  } catch (err) {
+    await sleep(0.6);
+    try {
+      const m = await import(new URL(`./scenes/${def.id}.js?retry=${Date.now()}`, import.meta.url).href);
+      def.load = () => Promise.resolve(m); // next time, this copy
+      return m;
+    } catch {
+      throw err;
+    }
+  }
+}
+
+/** Fetch the next chapter's code while this one plays, so her tap starts the transition at once. */
+function prefetchCode(def) {
+  if (!def) return;
+  const run = () => { def.load().catch(() => { /* goTo reports it if it really fails */ }); };
+  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 4000 });
+  else setTimeout(run, 1500);
+}
+
+/** A chapter's code didn't arrive (a dropped connection): say so gently and let her choose. */
+function loadFailed(index, { instant }) {
+  const def = app.list[index];
+  const old = document.querySelector('.load-fail');
+  if (old) old.remove();
+  const box = document.createElement('div');
+  box.className = 'load-fail';
+  box.setAttribute('role', 'alert');
+  const tries = (app.loadTries = (app.loadTries || 0) + 1);
+  box.innerHTML = `<p class="load-fail-text"></p><div class="load-fail-actions"><button type="button" class="btn-ghost lf-retry"></button><button type="button" class="btn-ghost lf-skip">Skip it</button></div>`;
+  box.querySelector('.load-fail-text').textContent = `“${chapterName(def)}” didn’t arrive. The connection may have dropped for a moment.`;
+  const retry = box.querySelector('.lf-retry');
+  // a browser can remember a failed download for the page's lifetime: after one retry, reload instead
+  // (her place is saved, so the invitation offers to continue right here)
+  retry.textContent = tries > 1 ? 'Reload' : 'Try again';
+  const close = () => box.remove();
+  retry.addEventListener('click', () => {
+    close();
+    if (tries > 1) { writePlace({ id: def.id, seen: seenIds(), finished: app.finished }); location.reload(); return; }
+    goTo(index, { instant });
+  });
+  const skip = box.querySelector('.lf-skip');
+  if (index + 1 < app.list.length) skip.addEventListener('click', () => { close(); app.loadTries = 0; goTo(index + 1, { instant }); });
+  else skip.remove();
+  document.getElementById('ui').appendChild(box);
+  retry.focus({ preventScroll: true });
+}
+
+const seenIds = () => [...app.seen].map((i) => app.list[i]?.id).filter(Boolean);
+
+/** History (one entry per chapter, the URL unchanged: Back goes to the previous chapter, not off the film)
+ *  and her saved place. Never for the countdown. */
+let placedOnce = false;
+function rememberPlace(def, { fromHistory = false } = {}) {
+  if (def.nav === false && def.id !== 'invite') return; // the countdown
+  // a chapters list still open over the old chapter closes (it would show the wrong place)
+  if (app.overlay && app.overlay.silent) { try { app.overlay.silent(); } catch { /* ignore */ } }
+  try {
+    const st = history.state;
+    // the browser is the source of truth for history: when Back / Forward was pressed while this chapter
+    // was on its way, the browser has already moved on and the queued chapter follows it — nothing is written
+    if (app.queued && app.queued.fromHistory && placedOnce) { /* as is */ }
+    // Back / Forward: the browser is already on this chapter's entry; nothing to add
+    else if (fromHistory && placedOnce && st && st.film && !st.overlay) { /* as is */ }
+    // the first chapter after a (re)load takes over the current entry (a refresh keeps the old chapter's
+    // state on it); an overlay's entry (the chapters list she picked from) is replaced, so Back skips it
+    else if (!placedOnce || !st || !st.film || st.overlay) history.replaceState({ film: def.id }, '');
+    else if (st.film !== def.id) history.pushState({ film: def.id }, '');
+  } catch { /* history unavailable (sandboxed frame) */ }
+  placedOnce = true;
+  app.overlay = null;
+  if (def.id === 'invite') return; // a return to the invitation keeps the place she had
+  writePlace({ id: def.id, seen: seenIds(), finished: app.finished });
+}
+
+/* ---------------- overlays the browser's Back closes first (the album, the chapters) ---------------- */
+let ignorePop = 0;
+function overlayOpened(name, close, silent = null) {
+  const film = app.list[app.index]?.id;
+  app.overlay = { name, close, silent };
+  try {
+    // one overlay straight after another (the chapters list → every photo) shares one entry
+    if (film && history.state && history.state.overlay) history.replaceState({ film, overlay: name }, '');
+    else if (film) history.pushState({ film, overlay: name }, '');
+  } catch { /* ignore */ }
+}
+/** The overlay closed itself (its ✕, Escape): take its history entry back off, quietly. */
+function overlayClosed(name) {
+  if (!app.overlay || app.overlay.name !== name) return;
+  app.overlay = null;
+  try {
+    if (history.state && history.state.overlay === name) { ignorePop++; history.back(); }
+  } catch { /* ignore */ }
+}
+window.addEventListener('popstate', (e) => {
+  if (ignorePop > 0) { ignorePop--; return; }
+  if (app.overlay) { const o = app.overlay; app.overlay = null; try { o.close(); } catch { /* ignore */ } return; }
+  const id = e.state && e.state.film;
+  if (!id) return;
+  const i = app.list.findIndex((c) => c.id === id);
+  if (i < 0) return;
+  // back onto the chapter on screen while another is on its way (Back, then Forward): it comes back after
+  if (i === app.index) { if (app.busy) app.queued = { index: i, instant: false, fromHistory: true }; return; }
+  document.querySelector('.load-fail')?.remove();
+  app.handoff = null;
+  goTo(i, { fromHistory: true });
+});
+
+/* ---------------- the chapters (a small list: where she is, where she has been) ---------------- */
+async function openChapters() {
+  // (a double tap while the list's code is still arriving opens it once)
+  if (app.openingChapters || (app.overlay && app.overlay.name === 'chapters')) return;
+  app.openingChapters = true;
+  let openChapterList;
+  try { ({ openChapterList } = await import('./core/chapters.js')); } finally { app.openingChapters = false; }
+  if (app.overlay && app.overlay.name === 'chapters') return;
+  // numbered like the film's own title cards ("Chapter One" is the first numbered chapter switched on);
+  // the parts around them (the prologue, the finale, the credits) carry a small star instead
+  let n = 0;
+  const items = app.list.map((def, i) => ({ i, id: def.id, name: chapterName(def), num: NUMBERED.has(def.id) ? ++n : null, nav: def.nav !== false, seen: app.seen.has(i), now: i === app.index }));
+  const list = openChapterList({
+    items,
+    finished: app.finished,
+    reducedMotion: device.reducedMotion,
+    gsap,
+    // picking a chapter: the list closes without going Back; the new chapter takes its history entry
+    onPick: (i) => { app.overlay = null; app.startSound(); app.handoff = null; goTo(i); },
+    onAlbum: () => app.current?.ctx.openGallery({ only: 'all' }),
+    onClose: () => overlayClosed('chapters'),
+  });
+  overlayOpened('chapters', () => list.close({ fromHistory: true }), () => list.close({ silent: true }));
 }
 
 let wakeLock = null;
@@ -358,14 +557,36 @@ async function requestImmersive() {
 
 function setupMute() {
   const btn = document.getElementById('mute');
+  // it silences everything (the music and the little sounds), so it says "sound"
   const sync = () => {
     btn.classList.toggle('muted', !!app.audio.muted);
-    btn.setAttribute('aria-label', app.audio.muted ? 'Play music' : 'Mute music');
+    btn.setAttribute('aria-label', 'Mute sound');
+    btn.title = app.audio.muted ? 'Sound is off (M)' : 'Mute sound (M)';
     btn.setAttribute('aria-pressed', app.audio.muted ? 'true' : 'false');
   };
-  btn.addEventListener('click', () => { app.audio.toggleMute(); sync(); });
+  // (a mouse or touch press doesn't leave focus on it, so Enter / Space still mean Continue afterwards)
+  btn.addEventListener('click', (e) => { app.audio.toggleMute(); sync(); if (e.detail > 0) btn.blur(); });
+  // M toggles the sound from anywhere (not while typing, and not before her first tap started it)
+  window.addEventListener('keydown', (e) => {
+    if ((e.key !== 'm' && e.key !== 'M') || e.ctrlKey || e.metaKey || e.altKey || e.repeat || btn.hidden) return;
+    if (e.target && e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    app.audio.toggleMute();
+    sync();
+  });
   sync();
   app.showMute = () => { btn.hidden = false; gsap.fromTo(btn, { opacity: 0 }, { opacity: 0.7, duration: 1 }); sync(); };
+}
+
+/** The chapters button (top left, the mute's mirror): where she is and the chapters she has seen. */
+function setupChapters() {
+  const btn = document.getElementById('chapters');
+  if (!btn) return;
+  btn.addEventListener('click', () => openChapters());
+  app.showChapters = () => {
+    if (!btn.hidden) return;
+    btn.hidden = false;
+    gsap.fromTo(btn, { opacity: 0 }, { opacity: 0.7, duration: 1 });
+  };
 }
 
 /** Type her name anywhere for a little secret. */
@@ -395,12 +616,40 @@ const PHOTO_FALLBACK = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="htt
 function guardImages() {
   document.addEventListener('error', (e) => {
     const img = e.target;
-    if (!img || img.tagName !== 'IMG' || img.dataset.fallback) return;
+    if (!img || img.tagName !== 'IMG') return;
+    // only the fallback itself failing stops it (a reused <img> with a new src is guarded again)
+    if (img.dataset.fallback && img.getAttribute('src') === PHOTO_FALLBACK) return;
     img.dataset.fallback = '1';
     img.removeAttribute('srcset');
     img.src = PHOTO_FALLBACK;
     console.warn('[film] a photo could not be loaded:', img.currentSrc || '');
   }, true);
+}
+
+/** The story couldn't start (no data, or content it can't read): a gentle message and a way to try again,
+ *  never a frozen "gathering sunlight…" or a stack trace. */
+function bootFailed(err) {
+  console.error(err);
+  if (document.querySelector('.boot-retry')) return;
+  let bootEl = document.getElementById('boot');
+  if (!bootEl) {
+    bootEl = document.createElement('div');
+    bootEl.id = 'boot';
+    bootEl.innerHTML = '<div class="boot-sun"></div><p class="boot-text"></p>';
+    document.body.appendChild(bootEl);
+  }
+  bootEl.classList.remove('gone');
+  bootEl.removeAttribute('aria-hidden');
+  const text = bootEl.querySelector('.boot-text');
+  text.setAttribute('role', 'alert');
+  text.textContent = 'Something went wrong loading the story. Please refresh.';
+  const again = document.createElement('button');
+  again.type = 'button';
+  again.className = 'btn-ghost boot-retry';
+  again.textContent = 'Try again';
+  again.addEventListener('click', () => location.reload());
+  bootEl.appendChild(again);
+  again.focus({ preventScroll: true });
 }
 
 async function boot() {
@@ -409,8 +658,7 @@ async function boot() {
   try {
     app.store = await loadSite({ draft: DRAFT });
   } catch (err) {
-    console.error(err);
-    document.querySelector('.boot-text').textContent = 'Something went wrong loading the story. Please refresh.';
+    bootFailed(err);
     return;
   }
   const { store } = app;
@@ -428,7 +676,7 @@ async function boot() {
   app.eggs = createEggs({ audio: app.audio, fx: app.fx });
   // development only: the motion debug overlay, for preview links with &debug
   if (PREVIEW && params.has('debug')) import('./core/debug.js').then((m) => m.startDebug(app, device)).catch(() => {});
-  const nick = (site.her?.nicknames || []).map((n) => String(n || '').trim()).filter(Boolean);
+  const nick = (Array.isArray(site.her?.nicknames) ? site.her.nicknames : []).map((n) => String(n || '').trim()).filter(Boolean);
   const tokens = {
     name: site.her?.name || '',
     nick1: nick[1] || nick[0] || site.her?.name || '',
@@ -443,6 +691,7 @@ async function boot() {
   const personal = personalValues(site);
   app.fill = (str) => fillText(str, tokens, personal, { preview: DRAFT });
   app.ui.setFill(app.fill);
+  store.setFill(app.fill);
   // "Chapter Five" → the real position among the numbered chapters that are switched on
   const NUM = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
   app.ui.setKicker((kicker) => {
@@ -453,7 +702,22 @@ async function boot() {
     return i >= 0 && NUM[i + 1] ? kicker.replace(m[1], NUM[i + 1]) : kicker;
   });
   app.list = CHAPTERS.filter((c) => (!c.when || c.when(store)) && store.chapterEnabled(c.id));
+  // her place from an earlier visit (only once the film is unlocked; never for a preview link's ?scene=)
+  if (!isLocked(site) && !START_AT) {
+    const place = readPlace();
+    if (place) {
+      for (const id of Array.isArray(place.seen) ? place.seen : []) {
+        const i = app.list.findIndex((c) => c.id === id);
+        if (i >= 0) app.seen.add(i);
+      }
+      app.finished = !!place.finished;
+      const i = app.list.findIndex((c) => c.id === place.id);
+      const first = app.list.findIndex((c, k) => k > 0 && c.nav !== false);
+      if (i > first && app.list[i].id !== 'credits') app.resume = { id: place.id, name: chapterName(app.list[i]) };
+    }
+  }
   setupMute();
+  setupChapters();
   setupKeyboardSecret();
   buildProgress();
 
@@ -483,6 +747,12 @@ async function boot() {
   return goTo(0, { instant: true });
 }
 
+// Leaving a chapter part-way (Back, the chapters list, Skip) aborts its pending waits: that AbortError is how
+// a chapter is stopped, not a failure, so a wait nobody was still listening to is let go quietly.
+window.addEventListener('unhandledrejection', (e) => {
+  if (e.reason && e.reason.name === 'AbortError') e.preventDefault();
+});
+
 // exposed for the invite scene (first gesture unlocks sound) and for debugging
 window.__film = app;
 app.startSound = async () => {
@@ -491,6 +761,7 @@ app.startSound = async () => {
   await app.audio.unlock();
   app.audio.startTheme();
   app.showMute && app.showMute();
+  app.showChapters && app.showChapters();
 };
 
-boot();
+boot().catch(bootFailed);

@@ -8,7 +8,7 @@ import { PHOTO_CHAPTERS, photosFor, chapterInfo, validate, isFanArt } from '../.
 import { state, srcFor, rawUrl, isDraftPhoto, basePhoto, rerender, lsSet } from '../state.js';
 import { intRatio, plural, ROLE_INFO, STORY, memoryName } from '../util.js';
 import { h, icon } from '../ui.js';
-import { addPhotos, replacePhoto, fillEmptySpots, deletePhoto, moveDialog, shiftPhoto, reorderChapter, previewPhotos } from '../photos.js';
+import { addPhotos, replacePhoto, fillEmptySpots, deletePhoto, moveDialog, shiftPhoto, reorderChapter, previewPhotos, deletedPublished, restorePhoto } from '../photos.js';
 import { openEditor } from '../editor.js';
 import { sectionHead } from './common.js';
 
@@ -85,7 +85,17 @@ export function renderLibrary() {
       list.length ? h('div.pgrid', list.map((p) => photoCard(p, { showChapter: true, sortable: false }))) : h('p.empty-note', empty));
   }
 
-  return h('div.library', head, checks, filters, h('div.lib-body', body));
+  // published photos this draft deletes: one tap brings each back (until the next publish)
+  const gone = deletedPublished();
+  const deleted = gone.length
+    ? h('details.howto.deleted-photos', { 'data-testid': 'deleted-photos' },
+      h('summary', `Deleted photos (${gone.length}) · still on the live site until you publish`),
+      h('ul.deleted-list', gone.map((p) => h('li',
+        h('span', `${p.label || 'Photo'} · ${chapterInfo(p.chapter).short}`),
+        h('button.btn.sm.ghost', { type: 'button', dataset: { restore: p.id }, onclick: () => restorePhoto(p.id) }, icon('undo'), 'Restore')))))
+    : null;
+
+  return h('div.library', head, checks, deleted, filters, h('div.lib-body', body));
 }
 
 function chapterBlock(ch, c) {

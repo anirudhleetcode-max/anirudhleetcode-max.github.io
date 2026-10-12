@@ -1,7 +1,11 @@
 // Little secrets hidden around the film. Finding one shows a soft golden toast;
 // the credits can say how many she found. Nothing ever depends on them.
 
-const KEY = 'deepu-secrets';
+// secrets found while the owner checks a preview link are kept apart from hers
+const PREVIEW = (() => { try { const q = new URLSearchParams(location.search); return q.has('preview') || q.has('draft'); } catch { return false; } })();
+const KEY = PREVIEW ? 'deepu-secrets-preview' : 'deepu-secrets';
+// the typed secret can't be found on a phone without a keyboard, so it isn't counted there
+const KEYBOARD = (() => { try { return matchMedia('(any-hover: hover) and (any-pointer: fine)').matches; } catch { return true; } })();
 
 /** Every secret in the film, so the credits can say "3 of 7". Chapters register theirs here. */
 export const SECRETS = {
@@ -54,8 +58,8 @@ export function createEggs({ audio, fx } = {}) {
       return isNew;
     },
     has(id) { return found.has(id); },
-    get count() { return [...found].filter((id) => id in SECRETS).length; },
-    get total() { return Object.keys(SECRETS).length; },
+    get count() { return [...found].filter((id) => id in SECRETS && (KEYBOARD || id !== 'keyboard')).length; },
+    get total() { return Object.keys(SECRETS).length - (KEYBOARD ? 0 : 1); },
     onFound(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     reset() { found = new Set(); write(found); },
     toast,

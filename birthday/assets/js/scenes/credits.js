@@ -91,10 +91,15 @@ export default {
     let stopped = false;
     const show = async () => {
       if (stopped || !reel.length) return;
-      const p = reel[idx % reel.length];
-      idx++;
-      await ctx.preload(p.url);
-      if (stopped) return;
+      // a photo that can't load is passed over (never a blank frame); if none can, the reel just rests
+      let p = null;
+      for (let tries = 0; tries < reel.length && !p; tries++) {
+        const q = reel[idx % reel.length];
+        idx++;
+        if (await ctx.preload(q.url)) p = q;
+        if (stopped) return;
+      }
+      if (!p) return;
       const img = document.createElement('img');
       img.src = p.url;
       img.alt = '';
@@ -155,7 +160,13 @@ export default {
     const secrets = end.querySelector('.cr-secrets');
     const wait = end.querySelector('.cr-wait');
     secrets.textContent = ctx.fill(String(t.secrets || 'Secrets found: {found} of {total}').replace('{found}', eggs.count).replace('{total}', eggs.total));
-    gsap.set([acts, secrets, wait], { opacity: 0 });
+    gsap.set([secrets, wait], { opacity: 0 });
+    gsap.set(acts, { autoAlpha: 0 }); // not tappable (or reachable by Tab) until it can be seen
+    // the buttons work from the moment they can be seen (a quick tap is never lost)
+    const more = end.querySelector('.cr-more');
+    more && more.addEventListener('click', () => ctx.openGallery({ only: 'extras' }));
+    end.querySelector('.cr-album').addEventListener('click', () => ctx.openGallery({ only: 'all' }));
+    end.querySelector('.cr-again').addEventListener('click', () => ctx.restart());
     gsap.fromTo(theEnd, { opacity: 0, filter: 'blur(12px)', letterSpacing: '0.4em' }, { opacity: 1, filter: 'blur(0px)', letterSpacing: '0.12em', duration: 2.6, ease: 'power3.out' });
     await ctx.wait(2.6);
     audio.sfx('magic');
@@ -165,14 +176,10 @@ export default {
       const r = sub.getBoundingClientRect();
       fx.sparkle(r.left + r.width / 2, r.top + r.height / 2, 34, { spread: r.width / 2 });
     }, 900));
-    gsap.to(acts, { opacity: 1, y: 0, duration: 1.2, delay: 2.4 });
+    gsap.to(acts, { autoAlpha: 1, y: 0, duration: 1.2, delay: 2.4 });
     gsap.to(secrets, { opacity: 0.7, duration: 1.2, delay: 3.2 });
     gsap.to(wait, { opacity: 0.55, duration: 1.2, delay: 5 });
 
-    const more = end.querySelector('.cr-more');
-    more && more.addEventListener('click', () => ctx.openGallery({ only: 'extras' }));
-    end.querySelector('.cr-album').addEventListener('click', () => ctx.openGallery({ only: 'all' }));
-    end.querySelector('.cr-again').addEventListener('click', () => ctx.restart());
 
     // ---------- post-credits (for whoever waits) ----------
     let posted = false;
@@ -207,7 +214,21 @@ export default {
       secrets.textContent = ctx.fill(String(t.secrets || 'Secrets found: {found} of {total}').replace('{found}', eggs.count).replace('{total}', eggs.total));
     };
     wait.addEventListener('click', postCredits);
-    this.timers.push(setTimeout(postCredits, 14000));
+    // the post-credits scene waits for her: never behind the album or the chapters list (it starts a few
+    // seconds after she closes them)
+    const overlayOpen = () => !!document.querySelector('#ui .gal, #ui .chl');
+    let sawOverlay = false;
+    const tryPost = () => {
+      if (posted || ctx.signal.aborted) return;
+      if (overlayOpen()) { sawOverlay = true; this.timers.push(setTimeout(tryPost, 1500)); return; }
+      if (sawOverlay) { sawOverlay = false; this.timers.push(setTimeout(tryPost, 6000)); return; }
+      postCredits();
+    };
+    this.timers.push(setTimeout(tryPost, 14000));
+    // and the music doesn't loop forever on the end card: it settles, then fades into silence
+    // (Watch again, or any other chapter, brings it back)
+    this.timers.push(setTimeout(() => { if (!ctx.signal.aborted) audio.setMood('quiet'); }, 150000));
+    this.timers.push(setTimeout(() => { if (!ctx.signal.aborted) audio.duck(0.0001, 36000, 1.5); }, 240000));
   },
   async exit() {
     (this.timers || []).forEach(clearTimeout);

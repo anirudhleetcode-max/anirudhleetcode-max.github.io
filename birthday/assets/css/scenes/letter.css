@@ -61,6 +61,27 @@
 }
 .lt-flower { position: absolute; right: 10px; bottom: 6px; width: 90px; opacity: .85; rotate: -18deg; pointer-events: none; }
 .lt-voice { margin-top: 22px; color: #6b2f57; background: rgba(107, 47, 87, .08); border-color: rgba(107, 47, 87, .4); }
+.lt-ink { display: inline; }
+/* the voice note: play / pause, a thin progress line, the time; one gentle line if it can't play */
+.lt-voice-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 4px; }
+.lt-voice-wrap[hidden] { display: none; }
+.lt-voice-label { white-space: pre-wrap; }
+.lt-voice { max-width: 100%; text-align: left; }
+.lt-voice-bar { width: min(260px, 70%); height: 2px; border-radius: 2px; background: rgba(107, 47, 87, .18); overflow: hidden; }
+.lt-voice-bar[hidden], .lt-voice-time[hidden] { display: none; }
+.lt-voice-bar i { display: block; height: 100%; background: #b0476f; transform: scaleX(0); transform-origin: 0 50%; transition: transform .25s linear; }
+.lt-voice-time { font-family: var(--f-caps); font-size: 11px; letter-spacing: .14em; color: rgba(107, 47, 87, .7); min-height: 1em; }
+.lt-voice-note { margin: 0; font-family: var(--f-hand); font-size: 20px; color: #6b2f57; }
+.lt-voice-note:empty { display: none; }
+/* "Show it all": the rest of the letter at once (quiet, beside the paper) */
+.lt-all {
+  position: absolute; right: max(12px, calc(var(--safe-r, 0px) + 12px)); bottom: calc(var(--lb, 0px) + 3.2vh + var(--safe-b)); z-index: 5;
+  min-height: 44px; padding: 10px 16px; border-radius: 999px; cursor: pointer;
+  font-family: var(--f-caps); font-size: 11.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--gold-hi);
+  background: rgba(22, 11, 38, .55); border: 1px solid rgba(244, 196, 99, .45);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.lt-all:hover, .lt-all:focus-visible { border-color: rgba(255, 227, 163, .9); }
 
 /* candle-lit writing desk */
 .lt-desk { position: absolute; left: 0; right: 0; bottom: 0; height: 34vh; pointer-events: none;
@@ -93,3 +114,5 @@
   content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 34vh; pointer-events: none; z-index: 1;
   background: linear-gradient(180deg, rgba(40, 22, 30, 0) 0%, rgba(58, 34, 34, .55) 30%, #2a1720 62%, #1d0f17 100%);
 }
+/* on a phone the "tap to write faster" hint sits on the bottom row: "Show it all" goes just above it */
+@media (max-width: 560px) { .lt-all { bottom: calc(var(--lb) + 3.4vh + var(--safe-b) + 56px); } }

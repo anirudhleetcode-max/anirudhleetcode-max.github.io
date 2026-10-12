@@ -121,6 +121,19 @@ svg.lt { display: block; width: 100%; height: 100%; overflow: visible; }
   display: flex; align-items: center; justify-content: center; gap: 10px;
   font-family: var(--f-caps); font-size: 10.5px; letter-spacing: .32em; text-transform: lowercase; color: var(--lavender); opacity: 0;
 }
+/* a return visit: continue where she left off · her photos · the chapters (quiet; the lantern stays the star) */
+.inv-more {
+  position: absolute; left: 0; right: 0; bottom: calc(var(--safe-b) + 4.6vh + 26px); z-index: 3;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; padding: 0 16px; opacity: 0;
+}
+.inv-more[hidden] { display: none; }
+.inv-alt {
+  min-height: 44px; padding: 10px 12px; border: 0; background: none; cursor: pointer;
+  font-family: var(--f-caps); font-size: clamp(10.5px, 2.9vw, 12px); letter-spacing: .22em; text-transform: uppercase;
+  color: var(--gold-hi); opacity: .82; text-decoration: underline; text-decoration-color: rgba(244, 196, 99, .4); text-underline-offset: 6px;
+  max-width: 100%; overflow-wrap: anywhere;
+}
+.inv-alt:hover, .inv-alt:focus-visible { opacity: 1; text-decoration-color: rgba(255, 227, 163, .9); }
 .inv-phones { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
 
 @media (orientation: landscape) {
@@ -128,6 +141,22 @@ svg.lt { display: block; width: 100%; height: 100%; overflow: visible; }
   .inv-lantern { height: clamp(112px, 21vh, 210px); }
   .inv-light { translate: -50% calc(-100% - 5vh); }
   .inv-greet { font-size: clamp(52px, 11vh, 112px); max-width: none; }
+}
+/* small portrait phones (320 × 568): the words a little higher, clear of the lantern */
+@media (orientation: portrait) and (max-height: 600px) {
+  .inv-copy { top: calc(var(--safe-t) + 7.5vh); }
+}
+/* landscape phones: the words on the left, the lantern on the right, so neither covers the other */
+@media (orientation: landscape) and (max-height: 540px) {
+  .inv-copy { right: 46%; top: calc(var(--safe-t) + 8vh); padding: 0 2vw 0 7vw; text-align: left; }
+  .inv-greet { margin: 0; font-size: clamp(38px, 13vh, 72px); }
+  .inv-lines { margin-left: 0; }
+  .inv-copy { right: 50%; }
+  .inv-lines p { font-size: clamp(14px, 4.4vh, 20px); text-wrap: pretty; }
+  .inv-light { left: 75%; padding-left: 8px; padding-right: 8px; }
+  .inv-label::before, .inv-label::after { width: 16px; }
+  /* a return visit's choices stay in the words' column, clear of the lantern's tap area */
+  .inv-more { right: 50%; justify-content: flex-start; padding: 0 2vw 0 7vw; }
 }
 
 /* ---------- gate (countdown) ---------- */

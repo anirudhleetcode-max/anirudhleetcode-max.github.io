@@ -11,7 +11,7 @@
  * into ONE commit.
  */
 import { saveDraft, loadDraft, clearDraft } from '../assets/js/shared/drafts.js';
-import { FILES, LEGACY_FILE, combine, upgrade, usedFiles, normalize } from '../assets/js/shared/model.js';
+import { FILES, LEGACY_FILE, combine, upgrade, usedFiles, normalize, malformedErrors } from '../assets/js/shared/model.js';
 import { GitHub } from './github.js';
 import { clone, deepEqual, describeChanges, deletedPaths, uniquePath, photoPaths, mergeSites } from './util.js';
 
@@ -299,6 +299,7 @@ export async function connectAndFetch() {
 /** Adopt a fresh published site, rebasing the draft onto it. */
 export function adoptBase(remote) {
   const prevBase = state.base;
+  state.baseProblems = malformedErrors(remote && remote.malformed);
   const fresh = normalize(clone(remote));
   if (prevBase && state.site && !deepEqual(prevBase, fresh)) {
     state.site = mergeSites(prevBase, state.site, fresh);

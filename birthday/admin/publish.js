@@ -6,9 +6,9 @@
  * deletion of files under photos/ or media/ that the content no longer uses and that exist
  * in the repo. A conflicting update (409/422) → re-read, 3-way merge, retry once.
  */
-import { FILES, split, combine, usedFiles, validate, PHOTO_CHAPTERS } from '../assets/js/shared/model.js';
+import { FILES, split, combine, usedFiles, validate, malformedErrors, PHOTO_CHAPTERS } from '../assets/js/shared/model.js';
 import {
-  state, changes, flushSave, resetDraft, client, connectAndFetch, adoptBase, storeToken, clearToken, tokenPlace, liveUrl, rerender, refreshChrome, globalStrength,
+  state, changes, flushSave, resetDraft, readDraft, client, connectAndFetch, adoptBase, storeToken, clearToken, tokenPlace, liveUrl, rerender, refreshChrome, globalStrength,
 } from './state.js';
 import { clone, deepEqual, mergeSites, isManagedPath, plural, formatBytes, stamp } from './util.js';
 import { jsonText } from './github.js';
@@ -20,6 +20,8 @@ import { SCHEMA as MESSAGE_GROUPS, showGroup } from './sections/messages.js';
 /** model.validate + a few friendly extras. */
 export function checks(site = state.site) {
   const v = validate(site);
+  // the published files themselves may have a part of the wrong shape (edited by hand on GitHub)
+  if (site === state.site && state.baseProblems && state.baseProblems.length) v.errors.push(...state.baseProblems);
   const warnings = [...v.warnings];
   const noAlt = (site.photos || []).filter((p) => p.src && p.enabled !== false && !p.alt && p.chapter !== 'fanart').length; // (the photoshoot doesn't use alt text)
   if (noAlt) warnings.push({ message: `${plural(noAlt, 'photo')} without alt text (a short description helps screen readers).`, gentle: true });
@@ -108,10 +110,66 @@ export const publishFlow = single(async () => {
   await doPublish(msg.value.trim() || fresh.message);
 });
 
+/**
+ * After a publish: is it really live? The admin is served by the live site itself, so it reads the
+ * site's own data files (no token needed) until they match what was just committed. Honest either way:
+ * "Live", or (after LIVE_LIMIT) "not updated yet" with the place to look; and from anywhere else
+ * (a local copy) it says it can't check rather than guessing. Keeps going if the sheet is closed.
+ */
+const LIVE_EVERY = 15000;
+const LIVE_LIMIT = 12 * 60000;
+let liveWatch = 0; // a newer publish retires the check of an older one (it can never report a false problem)
+export async function watchLive(expect, el, { every = LIVE_EVERY, limit = LIVE_LIMIT } = {}) {
+  const mine = ++liveWatch;
+  const current = () => mine === liveWatch;
+  const live = liveUrl();
+  const base = state.liveBase || (live && location.href.startsWith(live) ? live : '');
+  const say = (text, kind) => { el.textContent = text; el.dataset.state = kind; };
+  if (!base) { say('This page can’t check the live site from here. Open it in a few minutes to see your changes.', 'unknown'); return 'unknown'; }
+  say('Checking the live site…', 'waiting');
+  const t0 = Date.now();
+  // compared as the film reads them (normalized), so a file this publish didn't touch never looks "old"
+  const matches = async () => {
+    const got = {};
+    for (const [k, file] of Object.entries(FILES)) {
+      const res = await fetch(`${base}${file}?v=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) return false;
+      got[k] = await res.json();
+    }
+    const now = split(combine(got));
+    return Object.keys(FILES).every((k) => deepEqual(now[k], expect[k]));
+  };
+  for (;;) {
+    let okNow = false;
+    try { okNow = await matches(); } catch { okNow = false; }
+    if (!current()) { say('A newer publish is being checked instead.', 'superseded'); return 'superseded'; }
+    if (okNow) {
+      say('Live ✓ The site now shows your changes.', 'live');
+      if (!el.isConnected) toast('Your changes are live on the site ✓', { type: 'success' });
+      return 'live';
+    }
+    if (Date.now() - t0 >= limit) {
+      const { owner, repo } = state.repo;
+      say('The live site hasn’t updated yet. Its build may have stopped on a problem: check the Actions page of the repository.', 'late');
+      if (owner && repo) el.append(' ', h('a', { href: `https://github.com/${owner}/${repo}/actions`, target: '_blank', rel: 'noopener' }, 'Open Actions'));
+      if (!el.isConnected) toast('The live site hasn’t updated yet: check the repository’s Actions page.', { type: 'error' });
+      return 'late';
+    }
+    say('Waiting for the live site to update…', 'waiting');
+    await new Promise((r) => setTimeout(r, every));
+  }
+}
+
 /** Build the commit plan against what is on GitHub right now. Exported for tests. */
 export function planPublish({ base, site, files, remote, existing }) {
+  // files on GitHub with a part of the wrong shape (edited by hand) are never published over: the merge
+  // would quietly empty that part (every photo, say) instead of keeping what is there
+  const broken = malformedErrors(remote.site && remote.site.malformed);
+  if (broken.length) throw new Error(`The site’s files on GitHub need fixing first: ${broken.map((e) => e.message.split(',')[0]).join('; ')}. Nothing was published; your draft is safe.`);
   const remoteChanged = !deepEqual(remote.site, base);
   const merged = remoteChanged ? mergeSites(base, site, remote.site) : clone(site);
+  const after = validate(merged);
+  if (after.errors.length) throw new Error(`Combined with the latest changes on GitHub, this would break the film: ${after.errors[0].message} Nothing was published; your draft is safe.`);
   const refs = usedFiles(merged);
   const remoteRefs = usedFiles(remote.site);
   const upload = new Map();
@@ -157,11 +215,13 @@ async function doPublish(message) {
     rerender();
     refreshChrome();
     const live = liveUrl();
+    const liveStatus = h('p.live-status.small.center', { role: 'status', 'data-testid': 'live-status' });
     const done = openSheet({
       kicker: 'Done', title: 'Published! ✨', size: 'sm',
       content: [
         h('div.success-orb', { 'aria-hidden': 'true' }, icon('lantern')),
-        h('p.sheet-text.center', 'Your changes are on their way. The live site updates in about 1–2 minutes (refresh it if it still looks old).'),
+        h('p.sheet-text.center', 'Your changes are saved in the site’s repository. The live site rebuilds next (usually 1–3 minutes).'),
+        liveStatus,
         res.retried ? h('p.muted.small.center', 'Someone else changed the site at the same moment — both sets of changes were kept.') : null,
         res.deleted.length ? h('p.muted.small.center', `${plural(res.deleted.length, 'old file')} tidied away.`) : null,
       ],
@@ -170,6 +230,7 @@ async function doPublish(message) {
         h('button.btn.gold', { type: 'button', autofocus: true, onclick: () => done.close() }, 'Lovely'),
       ].filter(Boolean),
     });
+    watchLive(split(res.site), liveStatus);
   } catch (err) {
     console.error('[admin] publish failed', err);
     prog.close();
@@ -339,12 +400,29 @@ export async function reconnect() {
   refreshChrome();
 }
 
-export function forgetToken() {
+export async function forgetToken() {
   clearToken();
   state.conn = { status: 'none', message: '', token: '', info: null };
   refreshChrome();
   rerender();
+  // on a shared or borrowed device the unpublished draft (your words, new photos) would stay behind too
+  const unpublished = changes().count > 0 || state.files.size > 0 || !!(await readDraft());
+  if (unpublished) {
+    const also = await confirmDialog({
+      kicker: 'Token forgotten', title: 'Also remove your draft from this device?',
+      message: 'Your unpublished changes (your words and any new photos) are still saved in this browser. On a shared or borrowed device, remove them too. On your own device, keep them: they stay until you publish.',
+      confirm: 'Remove the draft', cancel: 'Keep it', danger: true,
+    });
+    if (also) {
+      const cleared = await resetDraft();
+      rerender();
+      refreshChrome();
+      toast(cleared ? 'Token and draft removed from this device.' : 'Token forgotten. The draft couldn’t be removed from this browser’s storage: clear the site data in the browser settings.', { type: cleared ? 'success' : 'error' });
+      return;
+    }
+  }
   toast('Token forgotten on this device.');
 }
+
 
 export { globalStrength };

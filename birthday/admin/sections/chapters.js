@@ -11,10 +11,11 @@ import { h, icon } from '../ui.js';
 import { openPreview, skipReason } from '../photos.js';
 import { counts } from './library.js';
 import { sectionHead } from './common.js';
+import { SCHEMA as WORDS, showGroup } from './messages.js';
 
 /** Which photo chapters a film chapter shows. */
 export const USES = {
-  prologue: ['prologue'], tower: ['tower'], hair: ['hair'], names: ['names'], dance: ['dance'], lanterns: ['lanterns'],
+  prologue: ['prologue'], tower: ['tower'], story: ['story'], hair: ['hair'], names: ['names'], dance: ['dance'], lanterns: ['lanterns'],
   letter: ['letter'], little: ['story'], favourites: ['story', 'fanart'], constellation: ['finale', 'album'], birthday: ['finale'], credits: ['album'],
 };
 /** Film chapters that also show her Featured ★ photos (any chapter's photo with “Featured ★” on). */
@@ -76,6 +77,8 @@ export function renderChapters() {
         warnings.length ? h('ul.chap-warn', warnings.map((w) => h('li', icon('warn'), w))) : null),
       h('div.chap-side',
         locked ? null : h('span.switch', toggle, h('span.switch-ui', { 'aria-hidden': 'true' })),
+        // its words (titles, narration) live in Messages: one tap opens that group
+        WORDS[fc.id] ? h('button.btn.sm.quiet', { type: 'button', dataset: { words: fc.id }, onclick: () => showGroup(fc.id), 'aria-label': `Edit the words of ${fc.label}` }, icon('quote'), h('span.hide-sm', 'Words')) : null,
         fc.id !== 'gate' && !skipped ? h('button.btn.sm.ghost', { type: 'button', onclick: () => openPreview(fc.id), 'aria-label': `Preview ${fc.label}` }, icon('eye'), h('span.hide-sm', 'Preview')) : null));
   });
   return h('div.chapters',

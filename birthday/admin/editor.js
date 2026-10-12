@@ -14,10 +14,13 @@ import { ROLES, nextOrder, reorder, chapterInfo, isFanArt } from '../assets/js/s
 import * as I from './images.js';
 import { state, change, photoById, globalStrength, srcFor } from './state.js';
 import { clone, deepEqual, intRatio, ROLE_INFO, STORY, memoryOptions, linkMemory } from './util.js';
-import { h, icon, toast, openSheet, textField, selectField, switchField, sliderField, segmented, debounce } from './ui.js';
+import { h, icon, toast, openSheet, confirmDialog, textField, selectField, switchField, sliderField, segmented, debounce } from './ui.js';
 import { focalPicker } from './focal.js';
 import { openCropper } from './cropper.js';
 import { loadOriginal, regenerate, withBusy, replacePhoto, deletePhoto, previewPhotos, chapterChoices, wholeImage, FANART_MOVE_NOTE } from './photos.js';
+
+/** The photo chapters whose scenes show a photo's caption next to it (the album shows every caption). */
+const CAPTION_SHOWN = new Set(['story', 'hair', 'lanterns', 'letter', 'album']);
 
 export const ANIMATIONS = [
   { value: '', label: 'Auto' },
@@ -84,7 +87,7 @@ export async function openEditor(id) {
   /* ---------- fields ---------- */
   const caption = fan
     ? textField({ label: 'Caption on the print', value: p.caption, multiline: true, maxlength: 240, placeholder: 'Empty = the caption in Messages → What makes you, you', hint: 'The “imagined · fan art” stamp is always on the print. No dates, places or events: it never happened.', oninput: (v) => { p.caption = v; } })
-    : textField({ label: 'Caption', value: p.caption, multiline: true, maxlength: 240, placeholder: 'Shown under the photo in the film', oninput: (v) => { p.caption = v; } });
+    : textField({ label: 'Caption', value: p.caption, multiline: true, maxlength: 240, placeholder: CAPTION_SHOWN.has(p.chapter) ? 'Shown with the photo in the film, and in the album' : 'Shown in the album at the end', hint: CAPTION_SHOWN.has(p.chapter) ? '' : 'This chapter shows its photos without words; the caption appears with the photo in the album at the end of the film.', oninput: (v) => { p.caption = v; } });
   caption.control.setAttribute('data-testid', 'edit-caption');
   const date = textField({ label: 'When', value: p.date, maxlength: 40, placeholder: 'e.g. Dec 2023', hint: 'Free text — “Dec 2023”, “Diwali 2022”, “last summer”.', oninput: (v) => { p.date = v; } });
   const alt = textField({ label: 'Alt text (describe the photo)', value: p.alt, maxlength: 220, placeholder: 'e.g. Deepu laughing under fairy lights', hint: 'Read aloud by screen readers.', oninput: (v) => { p.alt = v; } });
@@ -99,6 +102,7 @@ export async function openEditor(id) {
   };
   // “How it began” photos belong to one of the owner's memories (messages.json → story.memories)
   let memory = p.memory || '';
+  const startMemory = memory;
   const memorySel = selectField({
     label: 'Belongs to memory', value: memory, options: memoryOptions(state.site, memory),
     hint: 'The film shows this photo with that memory. Write or add memories in Messages → How it began.',
@@ -182,16 +186,24 @@ export async function openEditor(id) {
       h('details.fs.more', h('summary', 'Motion in the credits (optional)'), h('div.fs-body', h('p.field-hint', 'Every photo also drifts by in the slideshow behind the end credits. These choose how this one moves there and how long it stays. The chapters have their own choreography and don’t use them.'), anim, duration)));
 
   const saveBtn = h('button.btn.gold', { type: 'button', 'data-testid': 'edit-save', onclick: save }, icon('check'), 'Save changes');
+  // leaving with unsaved edits (Escape, ✕, a tap outside, Cancel) asks first; untouched, it just closes
+  const startState = JSON.stringify(p);
+  const dirty = () => JSON.stringify(p) !== startState || memory !== startMemory || freshCopy;
+  const leave = async () => !dirty() || confirmDialog({
+    kicker: 'Unsaved changes', title: 'Discard your changes?', danger: true, confirm: 'Discard', cancel: 'Keep editing',
+    message: 'You changed this photo’s details. Leave without saving them?',
+  });
   const s = openSheet({
+    beforeDismiss: leave,
     kicker: `${chapterInfo(p.chapter).short} · ${intRatio(p.ratio).label}`,
     title: p.label || 'Edit photo',
     size: 'xl',
     className: 'editor-sheet',
     content: h('div.editor', media, fields),
     actions: [
-      h('button.btn.quiet.danger-text', { type: 'button', 'aria-label': 'Delete this photo', title: 'Delete this photo', onclick: () => { s.close(null); deletePhoto(id); } }, icon('trash'), h('span.hide-sm', 'Delete')),
+      h('button.btn.quiet.danger-text', { type: 'button', 'aria-label': 'Delete this photo', title: 'Delete this photo', onclick: async () => { if (await deletePhoto(id)) s.close(null); } }, icon('trash'), h('span.hide-sm', 'Delete')),
       h('span.spacer'),
-      h('button.btn.ghost', { type: 'button', onclick: () => s.close(null) }, 'Cancel'),
+      h('button.btn.ghost', { type: 'button', onclick: async () => { if (await leave()) s.close(null); } }, 'Cancel'),
       saveBtn,
     ],
   });

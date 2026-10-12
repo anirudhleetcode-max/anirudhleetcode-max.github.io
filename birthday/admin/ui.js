@@ -54,6 +54,7 @@ const P = {
   download: '<path d="M12 4v12m0 0-4.5-4.5M12 16l4.5-4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
   replace: '<path d="M20 11a8 8 0 0 0-14.9-3.9L4 9"/><path d="M4 4v5h5"/><path d="M4 13a8 8 0 0 0 14.9 3.9L20 15"/><path d="M20 20v-5h-5"/>',
   undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   send: '<path d="M4 12 20 4l-4 16-4-7-8-1z"/><path d="m12 13 8-9"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -73,7 +74,6 @@ const P = {
   quote: '<path d="M7 7h4v5c0 3-1.5 5-4 5.5M15 7h4v5c0 3-1.5 5-4 5.5"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.3-2.4 3.8"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>',
-  heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
   lantern: '<path d="M9 3h6M10 3v2M14 3v2"/><path d="M7 7.5C7 6 8.5 5 12 5s5 1 5 2.5v8c0 1.5-1.5 2.5-5 2.5s-5-1-5-2.5z"/><path d="M10 18v2h4v-2"/><path d="M12 9.5c-1 1.2-1.4 2.2-.6 3.2.5.6 1.7.5 1.9-.4.2-.9-.4-1.8-1.3-2.8z"/>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   video: '<rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 10.5 5-3v9l-5-3z"/>',
@@ -181,7 +181,7 @@ export const sheetOpen = () => openSheets.length > 0;
  * Open a modal sheet. Returns { el, body, close(result), result: Promise, setActions(nodes) }.
  * @param {{title?:string, kicker?:string, content?:Node|Node[], actions?:Node[], size?:'sm'|'md'|'lg'|'full', drawer?:boolean, dismissible?:boolean, className?:string, keepToasts?:boolean}} o
  */
-export function openSheet({ title, kicker, content, actions, size = 'md', drawer = false, dismissible = true, className = '', keepToasts = false, wide, full, key = '' } = {}) {
+export function openSheet({ title, kicker, content, actions, size = 'md', drawer = false, dismissible = true, className = '', keepToasts = false, wide, full, key = '', beforeDismiss = null } = {}) {
   // a double tap must not stack two copies of the same dialog: the one already open is returned
   // (`duplicate: true` tells the second caller to stop there)
   if (key) { const same = openSheets.find((x) => x.key === key && !x.closed); if (same) return Object.assign(Object.create(same), { duplicate: true }); }
@@ -198,7 +198,7 @@ export function openSheet({ title, kicker, content, actions, size = 'md', drawer
       kicker ? h('p.sheet-kicker', kicker) : null,
       title ? h('h2.sheet-title', { id: titleId }, title) : null,
     ),
-    dismissible ? h('button.icon-btn.sheet-x', { type: 'button', 'aria-label': 'Close', onclick: () => close(null) }, icon('close')) : null,
+    dismissible ? h('button.icon-btn.sheet-x', { type: 'button', 'aria-label': 'Close', onclick: () => dismiss() }, icon('close')) : null,
   ) : null;
   const foot = h('footer.sheet-foot', { hidden: !(actions && actions.length) }, actions || []);
   const panel = h(`div.sheet.size-${size}${drawer ? '.drawer' : ''}`, {
@@ -207,7 +207,7 @@ export function openSheet({ title, kicker, content, actions, size = 'md', drawer
   }, head, body, foot);
   // a tap on the dim backdrop closes the sheet — but not the second tap of the double tap that opened it
   const openedAt = performance.now();
-  const backdrop = h(`div.sheet-backdrop${drawer ? '.drawer-backdrop' : ''}`, { onclick: (e) => { if (e.target === backdrop && dismissible && performance.now() - openedAt > 450) close(null); } }, panel);
+  const backdrop = h(`div.sheet-backdrop${drawer ? '.drawer-backdrop' : ''}`, { onclick: (e) => { if (e.target === backdrop && dismissible && performance.now() - openedAt > 450) dismiss(); } }, panel);
   root.append(backdrop);
   document.body.classList.add('has-sheet');
   const untrap = trapFocus(panel);
@@ -218,9 +218,21 @@ export function openSheet({ title, kicker, content, actions, size = 'md', drawer
     const f = fine ? panel.querySelector('[autofocus]') : null;
     (f || panel).focus({ preventScroll: true });
   }, 60);
-  const onKey = (e) => { if (e.key === 'Escape' && dismissible && openSheets[openSheets.length - 1] === api && !document.querySelector('.cropper')) close(null); };
+  const onKey = (e) => { if (e.key === 'Escape' && dismissible && openSheets[openSheets.length - 1] === api && !document.querySelector('.cropper')) dismiss(); };
   document.addEventListener('keydown', onKey);
   let closed = false;
+  // Escape, ✕ or a tap outside: a sheet with unsaved work (beforeDismiss) may ask first
+  let asking = false;
+  async function dismiss() {
+    if (closed || asking) return;
+    if (beforeDismiss) {
+      asking = true;
+      let go = false;
+      try { go = await beforeDismiss(); } finally { asking = false; }
+      if (!go) return;
+    }
+    close(null);
+  }
   function close(value) {
     if (closed) return;
     closed = true;
