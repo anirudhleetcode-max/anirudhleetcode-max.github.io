@@ -840,7 +840,12 @@ function build(ctx, el) {
     await wait(reduced ? 1.4 : 2.4);
     sfx('shimmer');
     const d = orbit.show({ stagger: Math.min(0.32, 4.2 / orbitPhotos.length), slowing: true }); // each a little later than the last
-    await wait(Math.min(d, 4) + (reduced ? 4 : 7));
+    await wait(Math.min(d, 4) + (reduced ? 2 : 3.5));
+    // …and they gather into a heart around her name
+    sfx('shimmer');
+    orbit.heart({ duration: 3.4 });
+    tw(titleEl, { opacity: 0.16, duration: 2.4, ease: 'sine.inOut' }); // her name steps back while the heart has the screen
+    await wait((reduced ? 1.6 : 3.4) + (reduced ? 3 : 5));
   }
 
   /* ================================================================ 5 · the last words */
@@ -850,7 +855,7 @@ function build(ctx, el) {
     const holds = words.map((w) => Math.max(2.6, 1.2 + w.split(/\s+/).length * 0.34));
     const total = holds.reduce((a, b) => a + b + 1.6, 0) + 2;
     audio.duck(0.62, total);
-    if (orbit) tw(orbit.state, { alpha: 0.58, speed: 0.45, duration: 3, ease: 'sine.inOut' }); // the words lead now
+    if (orbit) tw(orbit.state, { alpha: 0.5, floor: 0.2, speed: 0.45, duration: 3, ease: 'sine.inOut' }); // the words lead now (the heart stays, softly)
     tw(titleEl, { opacity: 0.8, duration: 3, ease: 'sine.inOut' });
     tw(hushEl, { opacity: 0.8, duration: 3 });
     await wait(1.2);

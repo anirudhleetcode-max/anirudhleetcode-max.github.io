@@ -7,8 +7,8 @@
 // HER IDENTITY CUES (from her approved photos: hero, finale, story-2, story-5, name-deepu, hair-1,
 // dance-5, letter-1): warm medium-light brown skin with a golden undertone (even-light cheek samples
 // #c1886e #c38c73 #c58667 → albedo #c08467, never lightened); VERY long near-black hair with a warm
-// brown sheen, straight with a soft wave toward the ends, a CENTER PART, worn loose — behind the
-// shoulders with a front section falling over each shoulder; a soft oval face with full cheeks and a
+// brown sheen, straight with a soft wave toward the ends, a CENTER PART, worn loose — ONE long silky
+// mass falling down her back behind the shoulders (no sections over the shoulders, never two braids); a soft oval face with full cheeks and a
 // small rounded chin; large dark-brown almond eyes; dark, natural, softly arched brows; a small
 // rounded nose; full lips with a natural rosy-brown tone and her usual gentle closed-lip smile. Her
 // everyday clothes are printed kurtis (a wine-maroon floral one with puffed sleeves and a V neck is
@@ -1148,9 +1148,10 @@ export function createFigure(env = {}, opts = {}) {
   bones[B.head].add(capMesh);
 
   // ---------------------------------------------------------------- hair: strands (verlet chains)
-  // Long hair = a continuous CURTAIN lofted across a row of chains round the back of the head (no gaps,
-  // a soft sheen, a natural line of tips) + a few separate layered RIBBONS on top (a front section
-  // over each shoulder, side layers). Short hair = a sculpted cap + a few loose locks.
+  // Long hair = ONE continuous CURTAIN lofted across a row of chains round the back of the head (no gaps,
+  // a soft sheen, a natural line of tips) + a few layered RIBBONS tucked into it behind the shoulders
+  // (side layers, so its edge is soft) — one long loose mass down her back, never two sections or
+  // braids. Short hair = a sculpted cap + a few loose locks.
   // Chains per quality: 15 / 10 / 6.
   const strands = [], ribbons = [], curtain = [];
   const segs = long ? [4, 6, 8][q] : [2, 2, 3][q];
@@ -1165,19 +1166,18 @@ export function createFigure(env = {}, opts = {}) {
     // lift off the section, brightness — so the edge of the hair is layered, never one flat card
     const LANES3 = [{ c: -0.36, w: 0.46, len: 0.9, lift: 0.002, tint: 0.9 }, { c: 0.02, w: 0.58, len: 1, lift: 0.007, tint: 1.04 }, { c: 0.38, w: 0.44, len: 0.83, lift: 0.003, tint: 0.96 }];
     const LANES2 = [{ c: -0.26, w: 0.6, len: 0.93, lift: 0.003, tint: 0.94 }, { c: 0.26, w: 0.58, len: 1, lift: 0.006, tint: 1.08 }];
-    // (a front section over EACH shoulder, as in her photos — the right one a touch shorter and
-    // lighter, in two sub-locks, never a mirror copy — on every tier; the side layers behind come
-    // with quality)
+    // (layered side locks, behind the shoulders and part of the same mass — never a separate section
+    // falling in front of a shoulder; more of them with quality)
     const RB = [
-      { side: 1, a: 0, front: true, ph: 0.86, rel: [0.9, -0.32, 0.28], hang: 0.66, width: 0.09, off: 0.011, lanes: LANES3 },
-      { side: -1, a: 0, front: true, ph: 0.84, rel: [-0.9, -0.34, 0.26], hang: 0.6, width: 0.086, off: 0.011, lanes: LANES2 },
-      { side: -1, a: 0.1, ph: 0.8, rel: [-0.9, -0.42, -0.14], hang: 0.78, width: 0.094, off: 0.007, lanes: LANES2 },
+      { side: -1, a: 0.1, ph: 0.8, rel: [-0.9, -0.42, -0.14], hang: 0.78, width: 0.094, off: 0.007, lanes: LANES3 },
       { side: 1, a: 0.35, ph: 0.35, rel: [0.84, -0.32, -0.42], hang: 0.86, width: 0.096, off: 0.008, lanes: LANES2 },
-    ].slice(0, [2, 3, 4][q]);
+    ].slice(0, [1, 2, 2][q]);
     for (const r of RB) mkStrand({ ...r, rootDir: partDir(r.ph, r.side), relDir: new THREE.Vector3(...r.rel).normalize(), hang: r.hang * (0.98 + R() * 0.04) });
-    const nC = [4, 7, 11][q];
+    // the curtain wraps round past the shoulders (±1.62 rad), so from the front the one long mass is
+    // seen falling behind both shoulders and down her back — the hair reads as long and loose, not short
+    const nC = [5, 9, 13][q];
     for (let i = 0; i < nC; i++) {
-      const ps = lerp(-1.3, 1.3, i / (nC - 1));
+      const ps = lerp(-1.62, 1.62, i / (nC - 1));
       mkStrand({
         kind: 'curtain', side: ps < 0 ? -1 : 1, ps,
         rootDir: new THREE.Vector3(Math.sin(ps) * 0.62, 0.42, -Math.cos(ps) * 0.72).normalize(),

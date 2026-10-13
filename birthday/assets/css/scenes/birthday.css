@@ -63,6 +63,9 @@
   box-shadow: 0 0 0 1px rgba(255, 227, 163, .32), 0 0 24px rgba(255, 176, 86, .26), 0 12px 28px rgba(0, 0, 0, .5);
 }
 .bd-ph img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* the heart the photographs gather into: a fine golden thread along the curve, behind them */
+.bd-heart { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 50; opacity: 0; overflow: visible; }
+.bd-heart path { fill: none; stroke: #f4c463; stroke-width: 1.6; stroke-linejoin: round; filter: drop-shadow(0 0 6px rgba(255, 179, 71, .75)); }
 
 /* the title */
 .bd-title {
