@@ -136,7 +136,7 @@ html:not(.reduced-motion) .ks-tile:hover { translate: 0 -2px; }
 .ks-sound-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .ks-sound-btn[aria-pressed="true"] { border-color: var(--ks-accent); }
 .ks-vol-wrap { display: flex; align-items: center; min-height: 44px; flex: 1 1 140px; max-width: 260px; }
-.ks-vol { width: 100%; accent-color: var(--ks-accent); }
+.ks-vol { width: 100%; height: 32px; margin: 0; accent-color: var(--ks-accent); } /* the whole 32 px is the touch target, not just the 16 px track */
 .ks-vol:disabled { opacity: .45; }
 .ks-sound-status { font-style: italic; font-size: 15px; color: var(--ks-soft); min-width: 3ch; }
 
