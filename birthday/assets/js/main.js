@@ -311,25 +311,38 @@ function makeCtx(def, ac, incoming) {
       setVolume: (v) => setVolume(v),
     },
   };
-  ctx.openGallery = async (opts) => {
+  // fromHistory: Back / Forward (or a reload) landed on the album's own entry, so it opens without writing one
+  ctx.openGallery = async (opts = {}, { fromHistory = false } = {}) => {
     const mod = await import('./scenes/gallery.js');
+    if (ac.signal.aborted) return null;
     const g = mod.openGallery(ctx, { ...opts, onClose: () => overlayClosed('album') });
-    overlayOpened('album', () => g.close({ fromHistory: true }));
+    overlayOpened('album', () => g.close({ fromHistory: true }), { state: { only: opts.only || 'all' }, fromHistory });
     return g;
   };
-  // the Keepsake Box (core/keepsakes.js): a room inside it is one history step, so Back returns to the box
-  ctx.openKeepsakes = async (opts = {}) => {
+  // the Keepsake Box (core/keepsakes.js): a room inside it is one history step, so Back returns to the box.
+  // fromHistory: the browser is already on the box's (or the room's) entry — it opens there, writing nothing
+  ctx.openKeepsakes = async (opts = {}, { fromHistory = false } = {}) => {
     if (app.openingBox || (app.overlay && app.overlay.name === 'keepsakes')) return null;
     app.openingBox = true;
     let mod;
     try { mod = await import('./core/keepsakes.js'); } catch (err) { console.warn('[keepsakes] unavailable', err); return null; } finally { app.openingBox = false; }
     if (ac.signal.aborted) return null;
+    const film = () => app.list[app.index]?.id;
     const step = {
-      push() { try { history.pushState({ film: app.list[app.index]?.id, overlay: 'keepsakes', step: 1 }, ''); } catch { /* ignore */ } },
+      // a room's entry names the room (Forward and a reload bring that room back); one room straight after
+      // another shares the entry, so Back always returns to the box
+      push(room) {
+        const st = { film: film(), overlay: 'keepsakes', step: 1, room };
+        if (history.state && history.state.step) writeEntry(st); else writeEntry(st, { push: true });
+      },
       pop() { try { if (history.state && history.state.step) { ignorePop++; history.back(); } } catch { /* ignore */ } },
     };
-    const k = mod.openKeepsakes(ctx, { ...opts, step, onClose: ({ steps = 1 } = {}) => overlayClosed('keepsakes', steps) });
-    overlayOpened('keepsakes', () => k.close({ fromHistory: true }), () => k.close({ fromHistory: true, quiet: true }), () => k.back());
+    const k = mod.openKeepsakes(ctx, { ...opts, step, fromHistory, onClose: ({ steps = 1 } = {}) => overlayClosed('keepsakes', steps) });
+    overlayOpened('keepsakes', () => k.close({ fromHistory: true }), {
+      silent: () => k.close({ fromHistory: true, quiet: true }),
+      toRoom: (room) => k.toRoom(room),
+      fromHistory,
+    });
     return k;
   };
   return ctx;
@@ -426,6 +439,9 @@ async function goTo(index, { instant = false, fromHistory = false } = {}) {
   const q = app.queued;
   app.queued = null;
   if (q && q.index !== app.index) goTo(q.index, { instant: q.instant, fromHistory: q.fromHistory });
+  // arrived by Back / Forward (or the browser moved on to one of its entries meanwhile): the overlay that
+  // entry names (the box, a room, the album) opens again over the chapter
+  else if ((fromHistory || (q && q.fromHistory)) && sameOverlay(history.state, app.list[app.index]?.id)) restoreEntry(history.state);
   return true;
 }
 
@@ -485,7 +501,22 @@ function loadFailed(index, { instant }) {
 const seenIds = () => [...app.seen].map((i) => app.list[i]?.id).filter(Boolean);
 
 /** History (one entry per chapter, the URL unchanged: Back goes to the previous chapter, not off the film)
- *  and her saved place. Never for the countdown. */
+ *  and her saved place. Never for the countdown.
+ *  Every entry says what it shows — { film } for a chapter, plus `overlay` ('album' | 'chapters' | 'keepsakes'),
+ *  the album's `only`, a Keepsake Box room's `room` (with `step`) — and its position `n`, so Back and Forward
+ *  know their direction. Back, Forward and a reload put the screen back to what the entry says (restoreEntry),
+ *  and an entry that would show nothing new is stepped over, so no press of Back or Forward is ever dead. */
+let pos = 0; // the position (n) of the entry the browser is on
+const bootState = (() => { try { const st = history.state; return st && typeof st === 'object' ? st : null; } catch { return null; } })();
+if (bootState && Number.isInteger(bootState.n)) pos = bootState.n;
+function writeEntry(state, { push = false } = {}) {
+  try {
+    if (push) { pos += 1; history.pushState({ ...state, n: pos }, ''); }
+    else history.replaceState({ ...state, n: pos }, '');
+  } catch { /* history unavailable (sandboxed frame) */ }
+}
+const sameOverlay = (st, film) => !!(st && st.film === film && st.overlay);
+
 let placedOnce = false;
 function rememberPlace(def, { fromHistory = false } = {}) {
   if (def.nav === false && def.id !== 'invite') return; // the countdown
@@ -496,12 +527,16 @@ function rememberPlace(def, { fromHistory = false } = {}) {
     // the browser is the source of truth for history: when Back / Forward was pressed while this chapter
     // was on its way, the browser has already moved on and the queued chapter follows it — nothing is written
     if (app.queued && app.queued.fromHistory && placedOnce) { /* as is */ }
-    // Back / Forward: the browser is already on this chapter's entry; nothing to add
-    else if (fromHistory && placedOnce && st && st.film && !st.overlay) { /* as is */ }
+    // Back / Forward: the browser is already on this chapter's entry (or on one of its overlays, which
+    // opens again once the chapter is in); nothing to add
+    else if (fromHistory && placedOnce && st && st.film && (!st.overlay || st.film === def.id)) { /* as is */ }
+    // a reload on one of this chapter's overlays (a Keepsake Box room, the album) keeps its entry: the
+    // overlay opens again over the chapter (boot), so the entries behind it still mean something
+    else if (!placedOnce && sameOverlay(st, def.id)) { /* as is */ }
     // the first chapter after a (re)load takes over the current entry (a refresh keeps the old chapter's
     // state on it); an overlay's entry (the chapters list she picked from) is replaced, so Back skips it
-    else if (!placedOnce || !st || !st.film || st.overlay) history.replaceState({ film: def.id }, '');
-    else if (st.film !== def.id) history.pushState({ film: def.id }, '');
+    else if (!placedOnce || !st || !st.film || st.overlay) writeEntry({ film: def.id });
+    else if (st.film !== def.id) writeEntry({ film: def.id }, { push: true });
   } catch { /* history unavailable (sandboxed frame) */ }
   placedOnce = true;
   app.overlay = null;
@@ -509,15 +544,18 @@ function rememberPlace(def, { fromHistory = false } = {}) {
   writePlace({ id: def.id, seen: seenIds(), finished: app.finished });
 }
 
-/* ---------------- overlays the browser's Back closes first (the album, the chapters) ---------------- */
+/* ---------------- overlays the browser's Back closes first (the album, the chapters, the box) ---------------- */
 let ignorePop = 0;
-function overlayOpened(name, close, silent = null, back = null) {
+/** An overlay opened: it gets its own history entry. fromHistory: the browser is already on it (Forward,
+ *  a reload), so nothing is written. state: what else the entry needs to open it again (the album's `only`). */
+function overlayOpened(name, close, { silent = null, toRoom = null, state = {}, fromHistory = false } = {}) {
   const film = app.list[app.index]?.id;
-  app.overlay = { name, close, silent, back };
+  app.overlay = { name, close, silent, toRoom };
+  if (fromHistory || !film) return;
   try {
     // one overlay straight after another (the chapters list → every photo) shares one entry
-    if (film && history.state && history.state.overlay) history.replaceState({ film, overlay: name }, '');
-    else if (film) history.pushState({ film, overlay: name }, '');
+    if (history.state && history.state.overlay) writeEntry({ film, overlay: name, ...state });
+    else writeEntry({ film, overlay: name, ...state }, { push: true });
   } catch { /* ignore */ }
 }
 /** The overlay closed itself (its ✕, Escape): take its history entry back off, quietly (and the step of a
@@ -532,29 +570,76 @@ function overlayClosed(name, steps = 1) {
     }
   } catch { /* ignore */ }
 }
+function shutOverlay() {
+  const o = app.overlay;
+  if (!o) return false;
+  app.overlay = null;
+  try { o.close(); } catch { /* ignore */ }
+  return true;
+}
+/** Put the screen right for the chapter's entry the browser is on: the overlay (and room) it names opens
+ *  without writing history, anything else open closes. True when the screen changed. */
+function restoreEntry(st) {
+  const want = st && st.overlay;
+  const o = app.overlay;
+  const ctx = app.current && app.current.ctx;
+  if (o && o.name === want) {
+    if (want === 'keepsakes' && o.toRoom) { try { return !!o.toRoom(st.room || null); } catch { return false; } }
+    return false;
+  }
+  const shut = shutOverlay();
+  if (!ctx || !want) return shut;
+  if (want === 'keepsakes') {
+    if (!boxOn(app.store.site)) return shut;
+    ctx.openKeepsakes({ room: st.room || null }, { fromHistory: true });
+    return true;
+  }
+  if (want === 'album') { ctx.openGallery({ only: st.only || 'all' }, { fromHistory: true }); return true; }
+  if (want === 'chapters') { openChapters({ fromHistory: true }); return true; }
+  return shut;
+}
+/** Over a reload: the overlay this chapter's entry was showing opens again; one that can't (switched off
+ *  since) gives the entry back to the chapter. True when it opened. */
+function restoreAfterLoad(st) {
+  const film = app.list[app.index]?.id;
+  if (!sameOverlay(st, film) || !sameOverlay(history.state, film)) return false;
+  if (restoreEntry(history.state)) return true;
+  writeEntry({ film });
+  return false;
+}
+let skips = 0;
 window.addEventListener('popstate', (e) => {
+  const st = e.state && typeof e.state === 'object' ? e.state : null;
+  const n = st && Number.isInteger(st.n) ? st.n : null;
+  const dir = n === null ? 0 : Math.sign(n - pos);
+  if (n !== null) pos = n;
   if (ignorePop > 0) { ignorePop--; return; }
-  if (app.overlay) {
-    const o = app.overlay;
-    // inside the Keepsake Box, Back first leaves the room she is in
-    try { if (o.back && o.back()) return; } catch { /* ignore */ }
-    app.overlay = null;
-    try { o.close(); } catch { /* ignore */ }
+  const id = st && st.film;
+  const i = id ? app.list.findIndex((c) => c.id === id) : -1;
+  if (i < 0) { shutOverlay(); skips = 0; return; }
+  if (i !== app.index) {
+    skips = 0;
+    // another chapter's entry: whatever is open over this one closes, and that chapter comes back (with the
+    // overlay its entry names, when it was one)
+    shutOverlay();
+    document.querySelector('.load-fail')?.remove();
+    app.handoff = null;
+    goTo(i, { fromHistory: true });
     return;
   }
-  const id = e.state && e.state.film;
-  if (!id) return;
-  const i = app.list.findIndex((c) => c.id === id);
-  if (i < 0) return;
   // back onto the chapter on screen while another is on its way (Back, then Forward): it comes back after
-  if (i === app.index) { if (app.busy) app.queued = { index: i, instant: false, fromHistory: true }; return; }
-  document.querySelector('.load-fail')?.remove();
-  app.handoff = null;
-  goTo(i, { fromHistory: true });
+  if (app.busy) { app.queued = { index: i, instant: false, fromHistory: true }; return; }
+  if (restoreEntry(st)) { skips = 0; return; }
+  // an entry that shows nothing new (left by an older visit): step over it, the way she was going — but
+  // never off the film's first entry by itself, and never more than a few in a row
+  if (dir && skips < 6 && !(dir < 0 && n <= 0)) {
+    skips++;
+    try { history.go(dir); } catch { /* ignore */ }
+  } else skips = 0;
 });
 
 /* ---------------- the chapters (a small list: where she is, where she has been) ---------------- */
-async function openChapters() {
+async function openChapters({ fromHistory = false } = {}) {
   // (a double tap while the list's code is still arriving opens it once)
   if (app.openingChapters || (app.overlay && app.overlay.name === 'chapters')) return;
   app.openingChapters = true;
@@ -576,7 +661,7 @@ async function openChapters() {
     onBox: app.finished && boxOn(app.store.site) ? () => app.current?.ctx.openKeepsakes() : null,
     onClose: () => overlayClosed('chapters'),
   });
-  overlayOpened('chapters', () => list.close({ fromHistory: true }), () => list.close({ silent: true }));
+  overlayOpened('chapters', () => list.close({ fromHistory: true }), { silent: () => list.close({ silent: true }), fromHistory });
 }
 
 let wakeLock = null;
@@ -793,8 +878,10 @@ async function boot() {
     return goTo(0, { instant: true });
   }
 
-  // an owner's preview link may open the Keepsake Box straight away (&box, or &box=<room>), over its chapter
+  // a reload on an overlay of the first chapter (a Keepsake Box room, the album) opens it again, on its own
+  // entry; otherwise an owner's preview link may open the Keepsake Box straight away (&box, or &box=<room>)
   const openBoxAfter = async (went) => {
+    if (went && restoreAfterLoad(bootState)) return went;
     if (went && PREVIEW && params.has('box') && app.current && boxOn(app.store.site)) await app.current.ctx.openKeepsakes({ room: params.get('box') || null });
     return went;
   };

@@ -97,10 +97,13 @@ function today(preview) {
  * Open the box. ctx: the chapter's ctx (main.js makeCtx). Options:
  *   room     — open straight into this room (a preview link's &box=<room>)
  *   onClose  — the box closed itself (✕, Escape): main.js takes its history entry back
- *   step     — { push(), pop() }: a room is a history step (the browser's Back returns to the box)
- * Returns { close({fromHistory}), back() → true when a room was open and is now closed, el }.
+ *   step     — { push(room), pop() }: a room is a history step (the browser's Back returns to the box)
+ *   fromHistory — the browser is already on the box's entry (Forward, a reload): `room` opens on its own
+ *              entry, nothing is pushed
+ * Returns { close({fromHistory}), toRoom(room) → true when the box now shows a different room (or the
+ * box itself, room null) because the browser moved to that entry, open(room), room, el }.
  */
-export function openKeepsakes(ctx, { room = null, onClose = null, step = null } = {}) {
+export function openKeepsakes(ctx, { room = null, onClose = null, step = null, fromHistory: startFromHistory = false } = {}) {
   const { gsap, audio } = ctx;
   const site = ctx.site;
   const reduced = !!(ctx.device && ctx.device.reducedMotion);
@@ -223,6 +226,7 @@ export function openKeepsakes(ctx, { room = null, onClose = null, step = null } 
   /* ---- rooms ---- */
   let current = null; // { id, cleanup, ac }
   let opening = 0;
+  let loading = null; // the room on its way (its code still arriving)
   const roomApi = (id, rac) => {
     const words = wordsFor(site, id);
     const api = {
@@ -274,9 +278,11 @@ export function openKeepsakes(ctx, { room = null, onClose = null, step = null } 
     return api;
   };
 
-  async function openRoom(id, { pushStep = true } = {}) {
+  /** fromHistory: the browser is already on this room's entry (Back / Forward, a reload) — nothing is pushed. */
+  async function openRoom(id, { fromHistory = false } = {}) {
     if (closed || !ROOM_CODE[id] || !rooms.some((r) => r.id === id)) return;
     const my = ++opening;
+    loading = id;
     let mod;
     try {
       // a room that didn't arrive is asked for again at a fresh address (a browser remembers a failed module
@@ -286,10 +292,12 @@ export function openKeepsakes(ctx, { room = null, onClose = null, step = null } 
       [mod] = await Promise.all([code(), loadCss(id)]);
     } catch (err) {
       console.warn('[keepsakes] a room did not arrive', id, err);
+      if (my === opening) loading = null;
       if (my === opening && !closed) announce('That one didn’t open. The connection may have dropped; try again in a moment.');
       return;
     }
     if (my !== opening || closed) return;
+    loading = null;
     if (current) closeRoom({ fromHistory: true, silent: true });
     const rac = new AbortController();
     host.replaceChildren();
@@ -306,8 +314,8 @@ export function openKeepsakes(ctx, { room = null, onClose = null, step = null } 
     panel.scrollTop = 0;
     let cleanup = null;
     current = { id, ac: rac, cleanup: null };
-    if (pushStep && step) step.push();
-    current.stepped = !!(pushStep && step);
+    if (step && !fromHistory) step.push(id);
+    current.stepped = !!step;
     try {
       cleanup = (mod.default || mod).open(roomApi(id, rac), el);
     } catch (err) {
@@ -420,12 +428,24 @@ export function openKeepsakes(ctx, { room = null, onClose = null, step = null } 
   }
 
   setTimeout(() => { if (!closed && !room) (wrap.querySelector('.ks-tile') || wrap.querySelector('.ks-close')).focus({ preventScroll: true }); }, 60);
-  if (room) openRoom(room);
+  if (room) openRoom(room, { fromHistory: startFromHistory });
 
   return {
     close,
-    /** The browser's Back while a room is open: back to the box (true); false when the box itself should close. */
-    back: () => (current ? closeRoom({ fromHistory: true }) : false),
+    /** The browser moved to the box's entry (room null) or a room's: show that (true when anything changed). */
+    toRoom: (id) => {
+      if (closed) return false;
+      if (!id) {
+        const was = loading;
+        opening++; // a room still on its way stays shut
+        loading = null;
+        return current ? closeRoom({ fromHistory: true }) : !!was;
+      }
+      if (current && current.id === id) return false;
+      if (!ROOM_CODE[id] || !rooms.some((r) => r.id === id)) return false;
+      openRoom(id, { fromHistory: true });
+      return true;
+    },
     open: (id) => openRoom(id),
     get room() { return current ? current.id : null; },
     el: wrap,
