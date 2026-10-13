@@ -1,0 +1,82 @@
+/* The Deepu files (keepsakes/lore.js): a manila folder, a typed sheet, a paper-clipped exhibit and a rubber stamp.
+   Every colour comes from the colour world: the folder is the world's paper tinted with its accent. */
+
+.ks-room-lore {
+  --klr-type: 'Courier Prime', 'Courier New', Courier, 'Liberation Mono', 'Nimbus Mono PS', ui-monospace, monospace;
+  --klr-folder: color-mix(in srgb, var(--ks-paper) 70%, var(--ks-accent) 30%);
+  --klr-folder-edge: color-mix(in srgb, var(--ks-paper) 52%, var(--ks-accent) 48%);
+  --klr-ink: var(--ks-paper-ink);
+  --klr-label: color-mix(in srgb, var(--ks-paper-ink) 78%, var(--ks-paper));
+  --klr-rule: color-mix(in srgb, var(--ks-paper-ink) 22%, transparent);
+  /* the stamp's ink: deep enough to read on the sheet in every world (the gold worlds darken it) */
+  --klr-stamp: color-mix(in srgb, var(--ks-accent) 40%, var(--ks-paper-ink));
+}
+.ks[data-world="paper"] .ks-room-lore, .ks[data-world="dawn"] .ks-room-lore { --klr-stamp: var(--ks-accent); }
+
+.klr-folder {
+  position: relative; margin: 26px 0 6px; padding: 14px 12px 16px; border-radius: 4px 12px 12px 12px;
+  background: var(--klr-folder); border: 1px solid var(--klr-folder-edge);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .28);
+}
+.klr-tab {
+  position: absolute; left: -1px; top: -25px; height: 26px; padding: 5px 16px 0; border-radius: 10px 10px 0 0;
+  background: var(--klr-folder); border: 1px solid var(--klr-folder-edge); border-bottom: 0;
+  font-family: var(--klr-type); font-size: 12px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; color: var(--klr-ink);
+}
+.klr-sheet {
+  position: relative; display: grid; gap: 14px; padding: 18px 18px 22px; border-radius: 2px; outline: none;
+  color: var(--klr-ink); background: var(--ks-paper); font-family: var(--klr-type);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .16), 0 6px 14px rgba(0, 0, 0, .12);
+}
+/* the sheet only takes focus as the room opens (it is not a control): no ring around the page */
+.ks .klr-sheet:focus, .ks .klr-sheet:focus-visible { outline: none; }
+.klr-top { padding-bottom: 12px; border-bottom: 2px solid var(--klr-rule); }
+.klr-intro { font-size: 16.5px; font-weight: 700; line-height: 1.45; color: var(--klr-ink); overflow-wrap: anywhere; }
+
+/* the exhibit is clipped to the top corner of the sheet and the typing runs around it, then under it */
+.klr-body { display: block; min-width: 0; }
+.klr-body::after { content: ''; display: block; clear: both; }
+.klr-fields { margin: 0; }
+.klr-row { margin: 0 0 12px; }
+.klr-row:last-child { margin-bottom: 0; }
+.klr-row dt { margin: 0 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--klr-label); }
+.klr-row dd { margin: 0; font-size: 16.5px; line-height: 1.45; color: var(--klr-ink); overflow-wrap: anywhere; }
+.klr-list { list-style: none; margin: 0; padding: 0; }
+.klr-list li { padding-left: 1.3em; text-indent: -1.3em; }
+.klr-list li + li { margin-top: 2px; }
+.klr-list li::before { content: '— '; }
+
+.klr-exhibit { position: relative; float: right; margin: 6px 4px 12px 16px; width: 138px; padding: 6px 6px 4px; background: var(--ks-paper); rotate: 2.5deg; box-shadow: 0 2px 4px rgba(0, 0, 0, .18), 0 10px 22px rgba(0, 0, 0, .2); border: 1px solid var(--klr-rule); }
+.klr-photo { display: block; aspect-ratio: 4 / 5; border-radius: 1px; }
+.klr-exhibit figcaption { padding: 5px 0 1px; text-align: center; font-size: 11.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--klr-ink); }
+.klr-clip {
+  position: absolute; z-index: 1; top: -12px; left: 18px; width: 14px; height: 40px; border-radius: 7px;
+  border: 2px solid color-mix(in srgb, var(--ks-paper-ink) 55%, var(--ks-paper)); background: transparent;
+}
+
+.klr-notes { display: grid; gap: 8px; padding-top: 12px; border-top: 2px solid var(--klr-rule); }
+.ks-card .klr-notes-h, .klr-notes-h { margin: 0; font-family: var(--klr-type); font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--klr-label); }
+.klr-note-list { margin: 0; padding-left: 2.2em; display: grid; gap: 6px; }
+.klr-note-list li { font-size: 16px; line-height: 1.45; color: var(--klr-ink); white-space: pre-line; overflow-wrap: anywhere; }
+
+.klr-stamp-wrap { display: flex; justify-content: center; padding: 10px 0 2px; overflow-x: clip; } /* the stamp comes down from 1.7x: never wider than the sheet on the way */
+.klr-stamp {
+  max-width: min(100%, 360px); padding: 8px 16px; rotate: -7deg; text-align: center;
+  border: 3px double var(--klr-stamp); border-radius: 8px; color: var(--klr-stamp);
+  font-family: var(--f-caps); font-weight: 600; font-size: clamp(16px, 4.6vw, 20px); line-height: 1.3; letter-spacing: .12em; text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.klr-stamp span { display: block; }
+
+html.reduced-motion .klr-stamp, html.reduced-motion .klr-exhibit { rotate: 0deg; }
+
+@media (max-width: 520px) {
+  .klr-folder { padding: 12px 8px 12px; }
+  .klr-sheet { padding: 16px 13px 20px; }
+  .klr-exhibit { width: 104px; margin: 6px 0 10px 12px; }
+  .klr-row dd { font-size: 15.5px; }
+}
+@media (max-width: 360px) {
+  .klr-exhibit { width: 92px; margin-left: 10px; }
+  .klr-exhibit figcaption { font-size: 10.5px; letter-spacing: .1em; }
+}

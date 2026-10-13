@@ -427,7 +427,9 @@ export function newMemory(existing = []) {
 /** “Memory 2 · October 2026”, or its first words when it has no date, or just “Memory 2”. Never shows the id. */
 export function memoryLabel(m, i = 0, { words = 6 } = {}) {
   const n = `Memory ${i + 1}`;
+  const title = m && typeof m.title === 'string' ? m.title.trim() : '';
   const when = m && typeof m.when === 'string' ? m.when.trim() : '';
+  if (title) return `${n} · ${title}${when ? ` (${when})` : ''}`;
   if (when) return `${n} · ${when}`;
   const all = (m && typeof m.text === 'string' ? m.text : '').trim().split(/\s+/).filter(Boolean);
   if (!all.length) return n;

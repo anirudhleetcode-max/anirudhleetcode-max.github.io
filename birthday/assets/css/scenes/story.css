@@ -36,6 +36,11 @@
   letter-spacing: .38em; margin-right: -.38em; font-size: clamp(11px, 2.8vw, 14px); color: var(--gold-hi);
   text-shadow: 0 1px 8px rgba(40, 14, 40, .7);
 }
+.st-title {
+  margin: 0 0 .55em; font-family: var(--f-caps); font-weight: 500; letter-spacing: .14em; line-height: 1.3;
+  font-size: clamp(13px, 3.4vw, 18px); color: var(--gold-hi); text-wrap: balance; overflow-wrap: anywhere;
+  text-shadow: 0 1px 8px rgba(40, 14, 40, .75), 0 0 2px rgba(40, 14, 40, .5);
+}
 .st-text { display: grid; gap: .25em; }
 .st-line {
   margin: 0; font-family: var(--f-serif); font-style: italic; font-weight: 500;
@@ -73,6 +78,7 @@
 @media (orientation: landscape) and (max-height: 540px) {
   .st-words { top: calc(max(var(--safe-t, 0px), var(--lb, 0px)) + max(1.5vh, 30px)); padding: 0 12vw; } /* below the progress dots */
   .st-when { margin-bottom: .35em; font-size: 10px; }
+  .st-title { margin-bottom: .3em; font-size: 12px; }
   .st-line { font-size: clamp(16px, 5.2vh, 40px); line-height: 1.2; }
   .st-window { top: 34%; height: 50vh; }
 }

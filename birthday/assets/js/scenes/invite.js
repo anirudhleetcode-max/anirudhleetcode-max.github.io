@@ -264,6 +264,7 @@ export default {
     const more = [
       resume ? `<button type="button" class="inv-alt inv-resume">Continue from “${esc(resume.name)}”</button>` : '',
       ctx.finished ? '<button type="button" class="inv-alt inv-album">Every photo</button>' : '',
+      ctx.finished && ctx.hasKeepsakes ? '<button type="button" class="inv-alt inv-box">The keepsake box</button>' : '',
       ctx.finished || resume ? '<button type="button" class="inv-alt inv-chapters">Chapters</button>' : '',
     ].join('');
 
@@ -353,6 +354,7 @@ export default {
             Promise.resolve(ctx.jump(resume.id)).then((went) => { if (went === false && !ctx.signal.aborted) done = false; });
           } else if (b.classList.contains('inv-album')) ctx.openGallery({ only: 'all' });
           else if (b.classList.contains('inv-chapters')) ctx.openChapters();
+          else if (b.classList.contains('inv-box')) ctx.openKeepsakes();
         });
       }
       const onKey = (e) => {

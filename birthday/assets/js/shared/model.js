@@ -64,6 +64,7 @@ export function chapterPlays(site, id) {
   if (id === 'little') return ['keychains', 'sprite', 'twinklingWatermelon'].some(on);
   if (id === 'favourites') return ['panipuri', 'manchuria'].some(on) || (on('nivin') && fanArtPhotos(site).length > 0);
   if (id === 'video') return !!(site && site.media && site.media.video);
+  if (id === 'met') return metCards(site).length > 0;
   return true;
 }
 
@@ -74,6 +75,7 @@ export const FILM_CHAPTERS = [
   { id: 'prologue', label: 'Prologue' },
   { id: 'tower', label: 'Chapter · The tower' },
   { id: 'story', label: 'Chapter · How it began (your memories)' },
+  { id: 'met', label: 'Chapter · The day we met, from my side (plays once you write a card)' },
   { id: 'hair', label: 'Chapter · The golden thread' },
   { id: 'names', label: 'Chapter · Her names' },
   { id: 'dance', label: 'Chapter · The festival' },
@@ -253,9 +255,12 @@ export const LIST_FIELDS = {
   dance: ['lines'], lanterns: ['lines'], letter: ['body'], cake: ['lines'], little: ['keychainLines', 'spriteLines', 'nightLines'],
   favourites: ['panipuriLines', 'manchuriaLines', 'nivinIntro', 'nivinLines', 'nivinAfter', 'revealLines'], constellation: ['lines'],
   birthday: ['lanterns', 'loved'], hug: ['intro', 'lines'], credits: ['roles', 'postCredits'],
+  // “The day we met” and the Keepsake Box (shared/keepsakes.js)
+  met: ['cards'], appreciation: ['cards'], remember: ['items'], reminders: ['items'], awards: ['items'], letters: ['items'],
+  months: ['doors'], flower: ['petals'],
 };
 // (these hold groups, not lines: a stray string there is reported, never turned into one)
-const OBJECT_LISTS = new Set(['story.memories', 'names.items', 'credits.roles']);
+const OBJECT_LISTS = new Set(['story.memories', 'names.items', 'credits.roles', 'met.cards', 'appreciation.cards', 'reminders.items', 'awards.items', 'letters.items']);
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** Fill defaults, repair ids/orders. Never removes owner data: a part with the wrong shape (typed by hand)
@@ -361,7 +366,7 @@ export function validate(site) {
     for (const f of LIST_FIELDS[group] || []) {
       const v = value[f];
       if (v != null && !Array.isArray(v)) errors.push({ group, message: `Messages → ${group} → ${f} should be a list${OBJECT_LISTS.has(`${group}.${f}`) ? '' : ' (one line per item)'}, so the film can't use it.` });
-      else if (Array.isArray(v) && v.some((x) => (OBJECT_LISTS.has(`${group}.${f}`) ? x == null || typeof x !== 'object' : typeof x !== 'string'))) errors.push({ group, message: `Messages → ${group} → ${f} has an item of the wrong kind (${OBJECT_LISTS.has(`${group}.${f}`) ? 'each one should be a group of fields' : 'each line should be text'}).` });
+      else if (Array.isArray(v) && v.some((x) => (OBJECT_LISTS.has(`${group}.${f}`) ? x == null || typeof x !== 'object' || (Array.isArray(x) && `${group}.${f}` !== 'credits.roles') : typeof x !== 'string'))) errors.push({ group, message: `Messages → ${group} → ${f} has an item of the wrong kind (${OBJECT_LISTS.has(`${group}.${f}`) ? 'each one should be a group of fields' : 'each line should be text'}).` });
     }
   }
   const ids = new Set();
@@ -410,7 +415,7 @@ export function validate(site) {
   const memIds = new Set();
   for (const [i, m] of mems.entries()) {
     const name = m.when || `Memory ${i + 1}`;
-    if (['when', 'text'].some((k) => m[k] != null && typeof m[k] !== 'string')) errors.push({ group: 'story', message: `${typeof m.when === 'string' && m.when ? m.when : `Memory ${i + 1}`} is malformed (its date and words must be text).` });
+    if (['when', 'text', 'title'].some((k) => m[k] != null && typeof m[k] !== 'string')) errors.push({ group: 'story', message: `${typeof m.when === 'string' && m.when ? m.when : `Memory ${i + 1}`} is malformed (its title, date and words must be text).` });
     if (!m.id || typeof m.id !== 'string') errors.push({ group: 'story', message: `${name} has no id (re-add it in Messages → How it began).` });
     else if (memIds.has(m.id)) errors.push({ group: 'story', message: `Two memories share the id "${m.id}".` });
     memIds.add(m.id);
@@ -419,6 +424,10 @@ export function validate(site) {
   for (const p of site.photos || []) {
     if (p.memory && !memIds.has(p.memory)) warnings.push({ id: p.id, message: `"${p.label || p.id}" belongs to a memory that no longer exists; it will be shown with the last memory.` });
   }
+  // “The day we met” and the Keepsake Box: a date that isn't one blocks; a photo that is gone is a reminder
+  const extra = keepsakeIssues(site);
+  errors.push(...extra.errors);
+  warnings.push(...extra.warnings);
   const big = site.text && site.text.birthday && site.text.birthday.big;
   if (typeof big === 'string' && !big.trim()) errors.push({ group: 'birthday', message: 'The birthday headline (Messages → Finale · 7,305 days → Big headline) is empty.' });
   for (const k of ['music', 'video', 'voice']) if (site.media && site.media[k] && !safePath(site.media[k])) errors.push({ message: `The ${k} file path is not a safe repo path.` });
@@ -535,4 +544,63 @@ export function daysAlive(site, when) {
   const birth = Date.parse(`${(site.her && site.her.birthDate) || '2007-01-03'}T00:00:00+05:30`);
   const end = when != null ? when : Date.parse(site.settings && site.settings.lock && site.settings.lock.unlockAt);
   return Math.round((end - birth) / 86400000);
+}
+
+/* ------------------------------------------------------- the day we met · the Keepsake Box (shared/keepsakes.js) */
+const strOf = (v) => (typeof v === 'string' ? v : '');
+
+/** Owner text that can really be shown: not empty, no leftover [PLACEHOLDER], no unwritten {memory}. */
+export function shows(site, s) {
+  const v = strOf(s).trim();
+  if (!v || PLACEHOLDER_RE.test(v)) return false;
+  return fillText(v, {}, personalValues(site)) !== '';
+}
+
+/** Real, enabled photos by id (fan art is imagined and never one of them). */
+export function realPhotoIds(site) {
+  return new Set((site && Array.isArray(site.photos) ? site.photos : []).filter((p) => isObj(p) && p.src && p.enabled !== false && p.chapter !== 'fanart').map((p) => p.id));
+}
+
+/** “The day we met, from my side” (messages.json → met.cards): the cards with something to show (words or a real photo). */
+export function metCards(site) {
+  const g = site && site.text && site.text.met;
+  const list = isObj(g) && Array.isArray(g.cards) ? g.cards : [];
+  const real = realPhotoIds(site);
+  return list.filter(isObj).map((c) => ({
+    heading: strOf(c.heading), text: strOf(c.text), feeling: strOf(c.feeling),
+    photos: (Array.isArray(c.photos) ? c.photos : []).filter((id) => typeof id === 'string' && real.has(id)),
+  })).filter((c) => shows(site, c.text) || shows(site, c.feeling) || c.photos.length);
+}
+
+/** A local calendar day (YYYY-MM-DD) as a Date at local midnight; null when it isn't a real date. */
+export function localDay(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(strOf(s).trim());
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return d.getFullYear() === Number(m[1]) && d.getMonth() === Number(m[2]) - 1 && d.getDate() === Number(m[3]) ? d : null;
+}
+
+/** Problems in “The day we met” and the Keepsake Box: a date that isn't one blocks publishing; a photo that is gone is a reminder. */
+export function keepsakeIssues(site) {
+  const errors = [];
+  const warnings = [];
+  const text = (site && site.text) || {};
+  const ids = new Set((site && Array.isArray(site.photos) ? site.photos : []).filter(isObj).map((p) => p.id));
+  const letters = isObj(text.letters) && Array.isArray(text.letters.items) ? text.letters.items : [];
+  letters.forEach((c, i) => {
+    if (!isObj(c)) return;
+    if (c.opensOn != null && typeof c.opensOn !== 'string') { errors.push({ group: 'letters', message: `Keepsake Box → Letters → letter ${i + 1}: its date has the wrong shape.` }); return; }
+    const d = strOf(c.opensOn).trim();
+    if (d && !localDay(d)) errors.push({ group: 'letters', message: `Keepsake Box → Letters → letter ${i + 1}: “${d}” isn’t a date (pick one, or leave it empty to open at once).` });
+  });
+  const cards = isObj(text.met) && Array.isArray(text.met.cards) ? text.met.cards : [];
+  cards.forEach((c, i) => {
+    if (!isObj(c)) return;
+    if (c.photos != null && !(Array.isArray(c.photos) && c.photos.every((x) => typeof x === 'string'))) { errors.push({ group: 'met', message: `The day we met → card ${i + 1}: its photos have the wrong shape (a list of photos).` }); return; }
+    const gone = (c.photos || []).filter((id) => !ids.has(id));
+    if (gone.length) warnings.push({ group: 'met', message: `The day we met → card ${i + 1}: ${gone.length} of its photos ${gone.length > 1 ? 'are' : 'is'} no longer in the library, so ${gone.length > 1 ? 'they are' : 'it is'} left out.` });
+  });
+  const sw = site && site.settings && site.settings.keepsakes;
+  if (sw != null && !isObj(sw)) errors.push({ message: 'settings.json → settings → keepsakes has the wrong shape (it should be a group of on/off switches).' });
+  return { errors, warnings };
 }

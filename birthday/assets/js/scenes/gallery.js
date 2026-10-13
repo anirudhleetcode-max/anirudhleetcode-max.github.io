@@ -3,6 +3,8 @@
 // large: ✕ / Escape / a tap beside it closes, ‹ › / arrow keys / a swipe go to the previous and next photo,
 // and "3 of 36" says where she is (also to screen readers).
 import { esc } from '../core/art.js';
+import { memoriesOf } from '../shared/model.js';
+import { memoryTitle } from '../shared/keepsakes.js';
 
 export function openGallery(ctx, { only = 'all', onClose = null } = {}) {
   const { gsap, audio } = ctx;
@@ -17,6 +19,13 @@ export function openGallery(ctx, { only = 'all', onClose = null } = {}) {
   const list = only === 'extras' ? extras : everything;
   // a caption or date the owner wrote (tokens filled; a line that still needs an unwritten memory is left out)
   const capOf = (p) => [ctx.fill(String(p.caption || '')).trim(), ctx.fill(String(p.date || '')).trim()];
+  // the memory a photo belongs to (How it began), by its title or first words: '' when it belongs to none
+  const mems = memoriesOf(ctx.site);
+  const memOf = (p) => {
+    const m = p && p.memory ? mems.find((x) => x.id === p.memory) : null;
+    // fill before memoryTitle cuts the text to its first words, so a [PLACEHOLDER] never gets cut in half
+    return m ? String(memoryTitle({ title: ctx.fill(String(m.title || '')), text: ctx.fill(String(m.text || '')) }) || '').trim() : '';
+  };
 
   const wrap = document.createElement('div');
   wrap.className = 'gal';
@@ -44,7 +53,7 @@ export function openGallery(ctx, { only = 'all', onClose = null } = {}) {
         <p class="gal-count" aria-live="polite"></p>
         <button type="button" class="gal-light-close" aria-label="Close the photo">✕</button>
       </div>
-      <figure class="gal-light-fig"><img alt=""><figcaption class="gal-light-cap"></figcaption></figure>
+      <figure class="gal-light-fig"><img alt=""><figcaption class="gal-light-cap"></figcaption><p class="gal-light-mem" hidden></p></figure>
       <button type="button" class="gal-nav gal-prev" aria-label="Previous photo">‹</button>
       <button type="button" class="gal-nav gal-next" aria-label="Next photo">›</button>
     </div>`;
@@ -59,6 +68,8 @@ export function openGallery(ctx, { only = 'all', onClose = null } = {}) {
   document.getElementById('ui').appendChild(light);
   const lightImg = light.querySelector('img');
   const lightCap = light.querySelector('.gal-light-cap');
+  const lightMem = light.querySelector('.gal-light-mem');
+  const lightFig = light.querySelector('.gal-light-fig');
   const count = light.querySelector('.gal-count');
   const opener = document.activeElement;
   let current = -1;
@@ -70,7 +81,8 @@ export function openGallery(ctx, { only = 'all', onClose = null } = {}) {
   light.setAttribute('aria-modal', 'true');
   light.setAttribute('aria-label', 'Photo');
   lightCap.id = `gal-cap-${Date.now().toString(36)}`;
-  light.setAttribute('aria-describedby', lightCap.id);
+  lightMem.id = `${lightCap.id}-mem`;
+  light.setAttribute('aria-describedby', `${lightCap.id} ${lightMem.id}`);
   light.tabIndex = -1;
   const multi = list.length > 1;
   light.querySelectorAll('.gal-nav').forEach((b) => { b.hidden = !multi; });
@@ -93,6 +105,10 @@ export function openGallery(ctx, { only = 'all', onClose = null } = {}) {
     light.setAttribute('aria-label', p.alt || 'Photo');
     lightCap.textContent = [cap, date].filter(Boolean).join(' · ');
     lightCap.hidden = !lightCap.textContent;
+    const mem = memOf(p);
+    lightMem.textContent = mem ? `From “${mem}”` : '';
+    lightMem.hidden = !mem;
+    lightFig.classList.toggle('has-mem', !!mem);
     count.textContent = multi ? `${current + 1} of ${list.length}` : '';
     if (lightTween) { lightTween.kill(); lightTween = null; } // a quick reopen must not be hidden by the last close
     if (light.hidden) {

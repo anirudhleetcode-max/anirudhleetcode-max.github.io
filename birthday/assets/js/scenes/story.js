@@ -54,6 +54,7 @@ export default {
       id: m.id,
       kind: KINDS.has(m.kind) ? m.kind : 'moment',
       when: ctx.fill(m.when || '').trim(),
+      title: ctx.fill(typeof m.title === 'string' ? m.title : '').trim(), // the owner's name for it, if any
       lines: splitLines(ctx.fill(m.text || '')), // '' while the owner hasn't written it → no words
       photos: byMem.get(m.id) || [],
     })).filter((b) => b.lines.length || b.photos.length);
@@ -86,7 +87,7 @@ export default {
       <canvas class="st-beads" aria-hidden="true"></canvas>
       <div class="st-notes cam-layer" style="--depth:.8" aria-hidden="true"></div>
       <div class="st-prints cam-layer" style="--depth:.55"></div>
-      <div class="st-words" role="status" aria-live="polite"><p class="st-when"></p><div class="st-text"></div></div>`;
+      <div class="st-words" role="status" aria-live="polite"><p class="st-when"></p><h2 class="st-title" hidden></h2><div class="st-text"></div></div>`;
     const sky = el.querySelector('.st-sky');
     const win = el.querySelector('.st-window');
     const winPhotos = el.querySelector('.st-win-photos');
@@ -95,6 +96,7 @@ export default {
     const notesLayer = el.querySelector('.st-notes');
     const printsLayer = el.querySelector('.st-prints');
     const whenEl = el.querySelector('.st-when');
+    const titleEl = el.querySelector('.st-title');
     const textEl = el.querySelector('.st-text');
 
     const W = () => el.clientWidth || window.innerWidth;
@@ -168,6 +170,10 @@ export default {
       whenEl.textContent = beat.when;
       gsap.set(whenEl, { opacity: 0 });
       if (beat.when) keep(gsap.to(whenEl, { opacity: 1, duration: 0.9 }));
+      // a memory the owner named: its title, small, above its words
+      titleEl.textContent = beat.title || '';
+      titleEl.hidden = !beat.title;
+      if (beat.title) keep(gsap.fromTo(titleEl, { opacity: 0 }, { opacity: 1, duration: 0.9 }));
       for (const line of beat.lines) {
         const p = document.createElement('p');
         p.className = 'st-line';
@@ -177,10 +183,12 @@ export default {
       }
     }
     async function hush() {
-      await tween([whenEl, textEl], { opacity: 0, y: reduced ? 0 : -8, duration: 0.8, ease: 'power2.in' });
+      await tween([whenEl, titleEl, textEl], { opacity: 0, y: reduced ? 0 : -8, duration: 0.8, ease: 'power2.in' });
       textEl.innerHTML = '';
       whenEl.textContent = '';
-      gsap.set([whenEl, textEl], { opacity: 1, y: 0 });
+      titleEl.textContent = '';
+      titleEl.hidden = true;
+      gsap.set([whenEl, titleEl, textEl], { opacity: 1, y: 0 });
     }
 
     /* ---------------------------------------------------------- prints (her photos, untouched) */

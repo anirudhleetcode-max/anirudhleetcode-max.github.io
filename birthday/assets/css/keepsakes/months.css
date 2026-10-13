@@ -1,0 +1,88 @@
+/* Twelve little doors (keepsakes/months.js): a grid of doors; an open one swings back on its hinge (a fade
+   under reduced motion) to show a wish written on paper behind it. 2 columns on a phone, 3 on a portrait
+   tablet, 4 on anything wide and landscape. */
+.md-intro:focus { outline: none; }
+.md-grid {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 440px) { .md-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; } }
+@media (min-width: 640px) and (orientation: landscape) { .md-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+.md-cell { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+.md-frame {
+  /* min-width 0: a door whose words are taller than its shape grows down, never sideways out of its column */
+  position: relative; display: grid; aspect-ratio: 3 / 4; min-width: 0;
+  border-radius: 12px; background: var(--ks-surface); border: 1px solid var(--ks-line);
+}
+@media (max-height: 460px) and (orientation: landscape) { .md-frame { aspect-ratio: 1 / 1; } }
+.md-frame > * { grid-area: 1 / 1; min-width: 0; }
+
+/* behind the door: the wish, on paper */
+.md-inside {
+  display: flex; flex-direction: column; justify-content: center; gap: 6px; margin: 6px; padding: 12px 10px 12px 24px; border-radius: 8px;
+  color: var(--ks-paper-ink); background: var(--ks-paper); text-align: center; cursor: pointer;
+  visibility: hidden; opacity: 0; transition: opacity .45s ease .2s, visibility 0s linear .65s;
+}
+.md-cell.is-open .md-inside { visibility: visible; opacity: 1; transition: opacity .45s ease .2s, visibility 0s; }
+.ks-room .md-inside p { margin: 0; }
+.md-inside-month { font-family: var(--f-caps); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--ks-paper-ink); }
+.md-wish { font-family: var(--f-serif); font-style: italic; font-size: 16.5px; line-height: 1.35; overflow-wrap: anywhere; }
+
+/* the door itself */
+.md-door {
+  position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  width: 100%; min-height: 0; margin: 0; padding: 14px 10px; border-radius: 11px; cursor: pointer; text-align: center;
+  font: inherit; color: var(--ks-ink);
+  background: linear-gradient(var(--ks-surface-2), var(--ks-surface-2)), var(--ks-bg);
+  border: 0;
+  transform-origin: left center; backface-visibility: hidden;
+  transition: transform .95s cubic-bezier(.2, .8, .25, 1), box-shadow .95s ease, opacity .3s ease;
+}
+.md-frame:hover { border-color: var(--ks-accent); }
+.md-cell.is-locked .md-frame:hover { border-color: var(--ks-line); }
+.md-door::before { content: ''; position: absolute; inset: 7px; border: 1px solid var(--ks-line); border-radius: 7px; pointer-events: none; }
+/* open: swung back on its hinge, nearly edge-on, so the wish behind it is clear */
+.md-cell.is-open .md-door { transform: perspective(1600px) rotateY(-84deg); box-shadow: 4px 0 14px rgba(0, 0, 0, .25); }
+/* its words step back as it swings, so no slivers of them are left at the hinge */
+.md-door > * { transition: opacity .35s ease; }
+.md-cell.is-open .md-door > * { opacity: 0; }
+.md-num { font-family: var(--f-serif); font-style: italic; font-size: 30px; line-height: 1; color: var(--ks-accent); }
+.md-month { font-family: var(--f-caps); font-size: 13.5px; letter-spacing: .14em; text-transform: uppercase; line-height: 1.25; overflow-wrap: anywhere; }
+.md-year { font-size: 14px; font-style: italic; color: var(--ks-soft); }
+.md-knob { position: absolute; right: 14px; top: 50%; width: 9px; height: 9px; margin-top: -4.5px; border-radius: 50%; background: var(--ks-accent); }
+
+/* a door whose day hasn't come */
+.md-cell.is-locked .md-frame { border-style: dashed; }
+.md-cell.is-locked .md-door { cursor: default; }
+.md-cell.is-locked .md-num { color: var(--ks-soft); }
+.md-lock { width: 20px; height: 20px; margin-top: 2px; fill: none; stroke: var(--ks-soft); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.md-locked-msg {
+  /* read with the door's name; shown once she tries it */
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.md-cell.is-told .md-locked-msg {
+  position: static; width: auto; height: auto; margin: 4px 0 0; overflow: visible; clip: auto; white-space: normal;
+  font-size: 14.5px; font-style: italic; line-height: 1.3; color: var(--ks-ink); overflow-wrap: anywhere;
+}
+
+/* focus: an open door has swung away, so the frame shows where focus is */
+.md-cell.is-open .md-door:focus-visible { outline: none; }
+.md-cell.is-open .md-frame:has(.md-door:focus-visible) { outline: 2px solid var(--ks-focus); outline-offset: 2px; }
+
+/* reduced motion: the door simply fades away (no swing) */
+.ks-room-months.is-reduced .md-door { transition: opacity .3s ease; }
+.ks-room-months.is-reduced .md-cell.is-open .md-door { transform: none; opacity: 0; }
+.ks-room-months.is-reduced .md-inside { transition: opacity .3s ease, visibility 0s linear .3s; }
+.ks-room-months.is-reduced .md-cell.is-open .md-inside { transition: opacity .3s ease, visibility 0s; }
+@media (prefers-reduced-motion: reduce) {
+  .md-door { transition: opacity .3s ease; }
+  .md-cell.is-open .md-door { transform: none; opacity: 0; }
+}
+
+@media (max-width: 360px) {
+  .md-grid { gap: 8px; }
+  .md-door { padding: 12px 6px; }
+  .md-month { font-size: 12px; letter-spacing: .1em; }
+  .md-wish { font-size: 15.5px; }
+}

@@ -8,13 +8,13 @@
  */
 import { FILES, split, combine, usedFiles, validate, malformedErrors, PHOTO_CHAPTERS } from '../assets/js/shared/model.js';
 import {
-  state, changes, flushSave, resetDraft, readDraft, client, connectAndFetch, adoptBase, storeToken, clearToken, tokenPlace, liveUrl, rerender, refreshChrome, globalStrength,
+  state, changes, flushSave, resetDraft, readDraft, client, connectAndFetch, adoptBase, storeToken, clearToken, tokenPlace, liveUrl, rerender, refreshChrome, globalStrength, noteLastPublish,
 } from './state.js';
 import { clone, deepEqual, mergeSites, isManagedPath, plural, formatBytes, stamp } from './util.js';
 import { jsonText } from './github.js';
 import { zipBlob } from './zip.js';
 import { h, icon, toast, openSheet, confirmDialog, progressSheet, switchField, single } from './ui.js';
-import { SCHEMA as MESSAGE_GROUPS, showGroup } from './sections/messages.js';
+import { SCHEMA as MESSAGE_GROUPS, KEEPSAKE_GROUPS, showGroup } from './sections/messages.js';
 
 /* ---------------------------------------------------------------- validation */
 /** model.validate + a few friendly extras. */
@@ -45,6 +45,7 @@ export function checksPanel(site = state.site) {
     if (it.chapter && PHOTO_CHAPTERS.some((x) => x.id === it.chapter)) return () => openLibrary(it.chapter);
     const p = photo(it.id);
     if (p) return () => openLibrary(p.chapter);
+    if (it.group && KEEPSAKE_GROUPS.has(it.group)) return () => { location.hash = '#keepsakes'; };
     if (it.group && MESSAGE_GROUPS[it.group]) return () => showGroup(it.group);
     return null;
   };
@@ -194,6 +195,7 @@ export function planPublish({ base, site, files, remote, existing }) {
 
 async function doPublish(message) {
   await flushSave();
+  const count = changes().count;
   const prog = progressSheet({ kicker: 'Publishing', title: 'Sending your changes to the site…' });
   const gh = client();
   const myBase = state.base;
@@ -230,7 +232,8 @@ async function doPublish(message) {
         h('button.btn.gold', { type: 'button', autofocus: true, onclick: () => done.close() }, 'Lovely'),
       ].filter(Boolean),
     });
-    watchLive(split(res.site), liveStatus);
+    noteLastPublish({ at: Date.now(), count, live: 'waiting' });
+    watchLive(split(res.site), liveStatus).then((r) => { if (r !== 'superseded') noteLastPublish({ live: r, checkedAt: Date.now() }); }).catch(() => {});
   } catch (err) {
     console.error('[admin] publish failed', err);
     prog.close();

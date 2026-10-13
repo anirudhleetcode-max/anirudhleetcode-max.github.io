@@ -396,8 +396,8 @@ export function textField({ label, value = '', oninput, onchange, multiline = fa
 }
 
 /** Accessible on/off switch (a checkbox with role="switch"). */
-export function switchField({ label, checked = false, onchange, hint = '', disabled = false, id = nextId('sw') }) {
-  const input = h('input', { type: 'checkbox', role: 'switch', id, checked, disabled, 'aria-describedby': hint ? `${id}-hint` : null });
+export function switchField({ label, checked = false, onchange, hint = '', disabled = false, id = nextId('sw'), ariaLabel = null }) {
+  const input = h('input', { type: 'checkbox', role: 'switch', id, checked, disabled, 'aria-describedby': hint ? `${id}-hint` : null, 'aria-label': ariaLabel });
   if (onchange) input.addEventListener('change', () => onchange(input.checked, input));
   const wrap = h(`div.switch-field${disabled ? '.is-disabled' : ''}`,
     h('label.switch-row', { for: id }, h('span.switch', input, h('span.switch-ui', { 'aria-hidden': 'true' })), h('span.switch-label', label)),

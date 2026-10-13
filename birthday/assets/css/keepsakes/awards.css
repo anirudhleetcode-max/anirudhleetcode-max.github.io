@@ -1,0 +1,27 @@
+/* The awards (keepsakes/awards.js): a certificate for each award, with a drawn rosette. */
+.ks-room-awards [tabindex="-1"] { outline: none; }
+
+.aw-list { list-style: none; margin: 0; padding: 4px 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); align-items: stretch; }
+.aw-cert { min-width: 0; display: grid; }
+.aw-frame {
+  display: grid; justify-items: center; align-content: start; gap: 10px; padding: 22px 18px 24px; border-radius: 10px; text-align: center;
+  color: var(--ks-paper-ink); background: var(--ks-paper);
+  border: 1.5px solid color-mix(in srgb, var(--ks-accent) 65%, var(--ks-paper));
+  box-shadow: inset 0 0 0 6px var(--ks-paper), inset 0 0 0 7px color-mix(in srgb, var(--ks-accent) 40%, transparent), 0 14px 30px rgba(0, 0, 0, .24);
+}
+.aw-medal { width: 64px; }
+.aw-rosette { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .2)); }
+.aw-tail { fill: color-mix(in srgb, var(--ks-accent) 80%, var(--ks-paper-ink)); }
+.aw-tail-2 { fill: var(--ks-accent); }
+.aw-edge { fill: var(--ks-accent); stroke: color-mix(in srgb, var(--ks-accent) 70%, var(--ks-paper-ink)); stroke-width: .8; stroke-linejoin: round; }
+.aw-ring { fill: none; stroke: var(--ks-paper); stroke-opacity: .7; stroke-width: 1.2; }
+.aw-face { fill: var(--ks-paper); }
+.aw-num { font-family: var(--f-caps); font-size: 15px; font-weight: 400; fill: var(--ks-paper-ink); }
+.aw-star { fill: var(--ks-accent); }
+.aw-words { display: grid; gap: 6px; min-width: 0; width: 100%; }
+.aw-kicker {
+  font-family: var(--f-caps); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; overflow-wrap: anywhere;
+  color: color-mix(in srgb, var(--ks-paper-ink) 78%, var(--ks-paper));
+}
+.aw-title { margin: 0; font-family: var(--f-serif); font-weight: 600; font-size: clamp(21px, 5.4vw, 24px); line-height: 1.25; color: var(--ks-paper-ink); overflow-wrap: anywhere; }
+.aw-line { font-family: var(--f-serif); font-style: italic; font-size: 17.5px; line-height: 1.45; color: var(--ks-paper-ink); white-space: pre-line; overflow-wrap: anywhere; }

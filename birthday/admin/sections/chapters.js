@@ -26,6 +26,8 @@ const BLURB = {
   invite: '“Hey Deepu.” — the invitation and the first tap that starts the sound.',
   prologue: 'Once upon a time… her very first photo.',
   tower: 'A tower whose walls are painted with her.',
+  story: 'How it all began, told through your own memories (Messages → How it began).',
+  met: 'Your side of the day you met, in your own words and photos. Plays only once you write a card (Messages → The day we met).',
   hair: 'The golden thread of memories, like polaroids on a ribbon.',
   names: 'Deepu… also known as… Kuchu Puchu — a legend of more than one name (the funny one).',
   dance: 'The festival — a 3D carousel of happy photos.',

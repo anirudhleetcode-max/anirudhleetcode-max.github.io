@@ -73,6 +73,16 @@ export const globalStrength = () => {
   const v = Number(state.site?.settings?.grading?.strength);
   return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.85;
 };
+/* the last publish from this device and whether the live site was seen to show it (no content, no token) */
+export const LAST_PUBLISH_KEY = 'deepu-admin-last-publish';
+export function lastPublish() {
+  try { const v = JSON.parse(lsGet(LAST_PUBLISH_KEY) || 'null'); return v && Number.isFinite(v.at) ? v : null; } catch { return null; }
+}
+export function noteLastPublish(patch) {
+  const v = { ...(patch.at ? {} : lastPublish() || {}), ...patch };
+  lsSet(LAST_PUBLISH_KEY, JSON.stringify({ at: v.at, count: Number(v.count) || 0, live: String(v.live || 'waiting'), checkedAt: v.checkedAt || null }));
+}
+
 export const changes = () => (state.base && state.site ? describeChanges(state.base, state.site) : { count: 0, items: [], message: '' });
 export const unpublishedCount = () => changes().count;
 export const hasUnsavedDraft = () => state.rev !== state.savedRev;

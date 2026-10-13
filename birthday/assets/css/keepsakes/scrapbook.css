@@ -1,0 +1,125 @@
+/* The scrapbook (keepsakes/scrapbook.js): memory pages with taped polaroids, then small taped prints,
+   and the photo viewer (a modal <dialog>, drawn above everything in the top layer). */
+
+.ks-room-scrapbook { gap: 18px; }
+/* grid items never grow wider than the room for an owner's long unbroken word */
+.ks-room-scrapbook > *, .ksb-page > *, .ksb-page-head > * { min-width: 0; }
+
+/* ---------- a memory's page ---------- */
+.ksb-page {
+  display: grid; gap: 10px; padding: 16px 14px 18px; border-radius: 14px;
+  background: var(--ks-surface); border: 1px solid var(--ks-line);
+}
+.ksb-page-head { display: grid; gap: 2px; }
+.ksb-name {
+  margin: 0; font-family: var(--f-hand); font-weight: 600; font-size: clamp(24px, 6.2vw, 31px); line-height: 1.12;
+  color: var(--ks-accent); overflow-wrap: anywhere;
+}
+/* a heading only ever takes focus when the room opens (it is not a control): no ring around the words */
+.ks .ksb-name[tabindex="-1"]:focus, .ks .ksb-more-title[tabindex="-1"]:focus { outline: none; }
+.ksb-when { font-family: var(--f-caps); font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--ks-soft); overflow-wrap: anywhere; }
+.ksb-text { font-size: 18px; line-height: 1.5; color: var(--ks-ink); white-space: pre-line; overflow-wrap: anywhere; }
+
+/* ---------- taped polaroids ---------- */
+.ksb-pols {
+  list-style: none; margin: 0; padding: 10px 4px 4px; display: grid; gap: 22px 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); align-items: start;
+}
+.ksb-pol-li, .ksb-print-li { position: relative; rotate: var(--tilt, 0deg); }
+.ksb-pol, .ksb-print {
+  position: relative; display: block; width: 100%; padding: 8px 8px 0; margin: 0; cursor: zoom-in; text-align: center;
+  color: var(--ks-paper-ink); background: var(--ks-paper); border: 0; border-radius: 3px; font: inherit;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .18), 0 10px 22px rgba(0, 0, 0, .22);
+  transition: box-shadow var(--motion-fast) ease, translate var(--motion-fast) var(--ease-settle);
+}
+.ksb-pol .ksb-photo, .ksb-print .ksb-photo { display: block; border-radius: 1px; }
+.ksb-cap {
+  display: block; min-height: 34px; padding: 6px 2px 8px; font-family: var(--f-hand); font-size: 19px; line-height: 1.15;
+  color: var(--ks-paper-ink); overflow-wrap: anywhere;
+}
+.ksb-cap.is-blank { min-height: 30px; padding: 0; }
+.ksb-tape {
+  position: absolute; z-index: 1; top: -10px; left: 50%; width: 64px; height: 20px; translate: -50% 0; rotate: -3deg;
+  background: color-mix(in srgb, var(--ks-accent) 32%, transparent);
+  border-left: 1px dashed color-mix(in srgb, var(--ks-paper) 60%, transparent);
+  border-right: 1px dashed color-mix(in srgb, var(--ks-paper) 60%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .12);
+  pointer-events: none;
+}
+.ksb-tape.is-small { width: 44px; height: 15px; top: -8px; }
+.ksb-pol:focus-visible, .ksb-print:focus-visible { outline: 3px solid var(--ks-focus); outline-offset: 3px; }
+@media (hover: hover) {
+  .ksb-pol:hover, .ksb-print:hover { box-shadow: 0 2px 4px rgba(0, 0, 0, .2), 0 16px 30px rgba(0, 0, 0, .28); }
+  html:not(.reduced-motion) .ksb-pol:hover, html:not(.reduced-motion) .ksb-print:hover { translate: 0 -3px; }
+}
+
+/* ---------- more pages: small taped prints ---------- */
+.ksb-more { display: grid; gap: 12px; }
+.ksb-more-title {
+  margin: 4px 0 0; font-family: var(--f-hand); font-weight: 600; font-size: clamp(24px, 6.2vw, 30px); line-height: 1.1;
+  color: var(--ks-accent);
+}
+.ksb-prints {
+  list-style: none; margin: 0; padding: 10px 4px 6px; display: grid; gap: 18px 10px;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+}
+.ksb-print { padding: 5px 5px 12px; min-height: 44px; }
+.ksb-print .ksb-photo { aspect-ratio: 4 / 5; }
+
+html.reduced-motion .ksb-pol-li, html.reduced-motion .ksb-print-li, html.reduced-motion .ksb-tape { rotate: 0deg; }
+html.reduced-motion .ksb-pol, html.reduced-motion .ksb-print { transition: none; }
+
+/* ---------- the photo viewer (a modal <dialog>: the top layer, so nothing behind can clip or move it) ---------- */
+.ksb-viewer {
+  position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden;
+  padding: calc(var(--safe-t) + 64px) calc(var(--safe-r) + 64px) calc(var(--safe-b) + 22px) calc(var(--safe-l) + 64px);
+  color: var(--ks-ink); background: var(--ks-bg); font-family: var(--f-serif); outline: none;
+  touch-action: pan-y pinch-zoom; /* a sideways swipe reaches the viewer (next / previous) */
+}
+.ksb-viewer:not([open]) { display: none; }
+.ksb-viewer.is-fallback { z-index: 70; }
+.ksb-viewer::backdrop { background: rgba(8, 4, 15, .82); }
+.ksb-v-bar {
+  position: absolute; top: calc(var(--safe-t) + 10px); left: calc(var(--safe-l) + 14px); right: calc(var(--safe-r) + 10px);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.ksb-v-count { margin: 0; font-family: var(--f-caps); font-size: 12px; letter-spacing: .26em; text-transform: uppercase; color: var(--ks-soft); }
+.ksb-v-close, .ksb-v-nav {
+  flex: none; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; padding: 0;
+  color: var(--ks-ink); background: var(--ks-surface-2); border: 1px solid var(--ks-line); font: inherit; font-size: 18px; line-height: 1;
+}
+.ksb-v-nav { position: absolute; top: 50%; translate: 0 -50%; font-size: 30px; }
+.ksb-v-nav span { display: block; margin-top: -4px; }
+.ksb-v-nav[hidden] { display: none; }
+.ksb-v-prev { left: calc(var(--safe-l) + 8px); }
+.ksb-v-next { right: calc(var(--safe-r) + 8px); }
+@media (hover: hover) { .ksb-v-close:hover, .ksb-v-nav:hover { border-color: var(--ks-accent); } }
+.ksb-v-fig { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 100%; max-height: 100%; min-height: 0; }
+.ksb-v-img {
+  display: block; max-width: 100%; max-height: calc(100vh - 210px); max-height: calc(100dvh - 210px); min-height: 0; object-fit: contain;
+  border: 6px solid var(--ks-paper); border-radius: 3px; box-shadow: 0 24px 60px rgba(0, 0, 0, .45);
+  user-select: none; -webkit-user-drag: none;
+}
+.ksb-v-cap { display: grid; gap: 4px; max-width: 34em; text-align: center; }
+.ksb-v-cap[hidden], .ksb-v-line[hidden], .ksb-v-from[hidden] { display: none; }
+.ksb-v-line { font-family: var(--f-hand); font-size: 23px; line-height: 1.15; color: var(--ks-ink); overflow-wrap: anywhere; }
+.ksb-v-from { font-style: italic; font-size: 16.5px; line-height: 1.35; color: var(--ks-soft); overflow-wrap: anywhere; }
+
+@media (max-width: 520px) {
+  .ksb-pols { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; }
+  .ksb-page { padding: 14px 10px 16px; }
+  .ksb-viewer { padding: calc(var(--safe-t) + 64px) calc(var(--safe-r) + 12px) calc(var(--safe-b) + 78px) calc(var(--safe-l) + 12px); }
+  .ksb-v-nav { top: auto; bottom: calc(var(--safe-b) + 14px); translate: none; }
+  .ksb-v-prev { left: calc(50% - 58px); }
+  .ksb-v-next { right: calc(50% - 58px); }
+  .ksb-v-img { max-height: calc(100vh - 230px); max-height: calc(100dvh - 230px); }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  .ksb-viewer { padding-top: calc(var(--safe-t) + 14px); padding-bottom: calc(var(--safe-b) + 12px); }
+  .ksb-v-bar { top: calc(var(--safe-t) + 8px); left: auto; right: calc(var(--safe-r) + 8px); flex-direction: column; align-items: flex-end; }
+  .ksb-v-img { max-height: calc(100vh - 90px); max-height: calc(100dvh - 90px); }
+  .ksb-v-cap { max-width: 60vw; }
+  .ksb-v-line { font-size: 19px; }
+  .ksb-v-from { font-size: 15px; }
+}

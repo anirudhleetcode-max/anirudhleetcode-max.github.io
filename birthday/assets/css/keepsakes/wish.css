@@ -1,0 +1,110 @@
+/* A lantern for your wish (keepsakes/wish.js): a small night sky, a paper lantern, a wish box.
+   The sky is always a night sky, drawn from each colour world's own ink so all four worlds keep their mood;
+   every word on the panel uses the world's colours (var(--ks-…)). */
+.ks-room-wish { gap: 16px; }
+.wl-intro:focus { outline: none; }
+
+/* ---- the sky ---- */
+.wl-sky {
+  --wl-night: color-mix(in srgb, var(--ks-paper-ink) 58%, black);
+  --wl-dusk: color-mix(in srgb, var(--ks-paper-ink) 88%, black);
+  --wl-hill: color-mix(in srgb, var(--ks-paper-ink) 50%, black);
+  --wl-hill-near: color-mix(in srgb, var(--ks-paper-ink) 34%, black);
+  --wl-star: var(--ks-paper);
+  --wl-glow: color-mix(in srgb, var(--ks-accent) 45%, var(--ks-paper));
+  --wl-size: 84px;
+  position: relative; overflow: hidden; isolation: isolate;
+  height: clamp(190px, 44vh, 400px); height: clamp(190px, 44svh, 400px);
+  border-radius: 16px; border: 1px solid var(--ks-line);
+  background-color: var(--wl-night);
+  background-image: radial-gradient(120% 70% at 50% 108%, var(--wl-dusk), transparent 70%), linear-gradient(180deg, var(--wl-night), var(--wl-dusk));
+  container-type: inline-size;
+  user-select: none; -webkit-user-select: none;
+}
+@supports (width: 1cqw) { .wl-sky { --wl-size: clamp(62px, 20cqw, 100px); } }
+
+.wl-stars, .wl-lights, .wl-flying { position: absolute; inset: 0; pointer-events: none; }
+.wl-star {
+  position: absolute; width: var(--s); height: var(--s); border-radius: 50%;
+  background: var(--wl-star); opacity: .55;
+}
+.ks-room-wish:not(.is-reduced) .wl-star.is-twinkle { animation: wl-twinkle 4.2s ease-in-out var(--d) infinite; }
+@keyframes wl-twinkle { 0%, 100% { opacity: .2; } 50% { opacity: .8; } }
+
+.wl-light {
+  position: absolute; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%;
+  background: var(--wl-glow); box-shadow: 0 0 6px 2px color-mix(in srgb, var(--wl-glow) 70%, transparent), 0 0 16px 4px color-mix(in srgb, var(--wl-glow) 30%, transparent);
+}
+.ks-room-wish:not(.is-reduced) .wl-light { animation: wl-flicker 5s ease-in-out var(--d) infinite; }
+@keyframes wl-flicker { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(.7); } }
+
+.wl-hills { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 18%; min-height: 34px; fill: var(--wl-hill); pointer-events: none; }
+.wl-hills .wl-hills-near { fill: var(--wl-hill-near); }
+
+/* the lantern in her hands */
+.wl-ready {
+  position: absolute; left: 50%; bottom: 14%; width: var(--wl-size); margin-left: calc(var(--wl-size) / -2);
+  cursor: grab; touch-action: none; z-index: 2;
+}
+.wl-ready.is-held { cursor: grabbing; }
+.ks-room-wish:not(.is-reduced) .wl-ready-bob { animation: wl-bob 3.6s ease-in-out infinite; }
+.wl-ready.is-held .wl-ready-bob { animation-play-state: paused; }
+@keyframes wl-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -4px; } }
+.wl-svg { display: block; width: 100%; height: auto; overflow: visible; pointer-events: none; }
+
+/* a lantern on its way */
+.wl-flyer { position: absolute; width: var(--wl-size); z-index: 1; will-change: transform; }
+.wl-sway { position: relative; }
+.wl-words {
+  position: absolute; left: 23%; right: 23%; top: 24%; max-height: 50%;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; overflow: hidden;
+  font-family: var(--f-hand); font-size: max(11px, calc(var(--wl-size) * .15)); line-height: 1.02; text-align: center;
+  color: color-mix(in srgb, var(--ks-paper-ink) 80%, black); overflow-wrap: anywhere; pointer-events: none;
+}
+/* the sun on the paper steps back so the words can be read */
+.wl-flyer .l-body g { opacity: .28; }
+.wl-words:empty { display: none; }
+
+.wl-hint {
+  position: absolute; left: 8px; right: 8px; bottom: 5px; z-index: 3; margin: 0;
+  font-style: italic; font-size: 13.5px; line-height: 1.25; text-align: center; pointer-events: none;
+  color: var(--ks-paper);
+}
+
+/* ---- the wish box ---- */
+.wl-form { display: grid; gap: 8px; }
+.wl-label { font-family: var(--f-caps); font-size: 11.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--ks-soft); }
+.wl-field { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+.wl-input {
+  flex: 1 1 220px; min-width: 0; min-height: 48px; padding: 0 16px; border-radius: 14px;
+  font: inherit; font-size: 18px; color: var(--ks-ink); background: var(--ks-surface); border: 1px solid var(--ks-line);
+  caret-color: var(--ks-accent);
+}
+.wl-input::placeholder { color: var(--ks-soft); opacity: 1; font-style: italic; }
+.wl-input:focus-visible { outline: 2px solid var(--ks-focus); outline-offset: 2px; border-color: var(--ks-accent); }
+.wl-go { flex: 0 1 auto; min-height: 48px; }
+/* an owner's label with one very long word wraps instead of widening the room */
+.wl-go, .wl-again { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.wl-privacy { line-height: 1.4; }
+
+.wl-after { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+.wl-after[hidden] { display: none; }
+.wl-after-text { font-style: italic; font-size: 18px; line-height: 1.4; color: var(--ks-ink); }
+
+@media (max-width: 420px) {
+  .wl-go { flex: 1 1 100%; }
+}
+/* a short landscape screen: the sky and the wish box side by side, so both are in view */
+@media (max-height: 460px) and (orientation: landscape) {
+  .ks-room-wish { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; column-gap: 16px; }
+  .ks-room-wish > .wl-intro { grid-column: 1 / -1; }
+  .wl-sky { grid-column: 1; grid-row: span 2; height: clamp(170px, 54vh, 240px); height: clamp(170px, 54svh, 240px); }
+  .wl-form, .wl-after { grid-column: 2; }
+  .wl-ready { bottom: 12%; }
+  .wl-go { flex: 1 1 100%; }
+}
+/* reduced motion: the drawing's own flame flicker and halo pulse (scenes/shared.css) stay still too */
+.ks-room-wish.is-reduced .lantern-svg .l-flame, .ks-room-wish.is-reduced .lantern-svg .l-halo { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .wl-star.is-twinkle, .wl-light, .wl-ready-bob, .ks-room-wish .lantern-svg .l-flame, .ks-room-wish .lantern-svg .l-halo { animation: none !important; }
+}

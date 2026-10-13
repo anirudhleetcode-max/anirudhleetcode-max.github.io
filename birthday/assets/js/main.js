@@ -6,7 +6,8 @@ import { createFX } from './core/fx.js';
 import { createUI, sleep } from './core/ui.js';
 import { transition } from './core/transitions.js';
 import { createEggs } from './core/eggs.js';
-import { fillText, personalValues } from './shared/model.js';
+import { fillText, personalValues, metCards } from './shared/model.js';
+import { boxOn } from './shared/keepsakes.js';
 import { setRibbonGlow } from './core/ribbon.js';
 import { registerEases } from './core/motion.js';
 import { attachCamera } from './core/camera.js';
@@ -81,6 +82,8 @@ const CHAPTERS = [
   { id: 'prologue', title: 'Once Upon a Deepu', load: () => import('./scenes/prologue.js'), via: 'lantern', grade: 'dawn', preload: ['prologue'] },
   { id: 'tower', title: 'A Tower Full of You', load: () => import('./scenes/tower.js'), via: 'sun', grade: 'day', preload: ['tower'] },
   { id: 'story', title: 'How It Began', load: () => import('./scenes/story.js'), via: 'ribbon', grade: 'day', preload: ['story'], slot: (w, h) => Math.min(w, h) * 0.5 },
+  // the owner's side of the day they met: only once they have written a card (admin → Messages)
+  { id: 'met', title: 'The Day We Met, From My Side', load: () => import('./scenes/met.js'), via: 'glow', grade: 'day', when: (s) => metCards(s.site).length > 0 },
   { id: 'hair', title: 'The Golden Thread', load: () => import('./scenes/hair.js'), via: 'glow', grade: 'sunset', preload: ['hair'], slot: (w, h) => (h >= w ? w * 0.56 : w * 0.18) },
   { id: 'names', title: 'A Legend of Many Names', load: () => import('./scenes/names.js'), via: 'ember', grade: 'sunset', preload: ['names'] },
   { id: 'dance', title: 'Somewhere Between Chaos and Magic', load: () => import('./scenes/dance.js'), via: 'petals', grade: 'twilight', preload: ['dance'], slot: danceSlot },
@@ -102,7 +105,7 @@ const CHAPTERS = [
 ];
 
 // the chapters with a "Chapter …" card, in film order (their numbers follow the chapters switched on)
-const NUMBERED = new Set(['tower', 'story', 'hair', 'names', 'dance', 'lanterns', 'letter', 'little', 'favourites', 'cake', 'constellation']);
+const NUMBERED = new Set(['tower', 'story', 'met', 'hair', 'names', 'dance', 'lanterns', 'letter', 'little', 'favourites', 'cake', 'constellation']);
 /** A chapter's name for the progress dots and screen readers: the owner's title (Messages), else the built-in one. */
 const chapterName = (def) => {
   const own = app.fill && app.store ? String(app.fill(String(app.store.text?.[def.id]?.title || ''))).trim() : '';
@@ -294,12 +297,40 @@ function makeCtx(def, ac, incoming) {
     openChapters: () => openChapters(),
     immersive: requestImmersive,
     startSound: () => app.startSound(),
+    /** An owner's preview link (?preview / ?draft): never her real place, and dated things all open. */
+    preview: PREVIEW,
+    /** The Keepsake Box has something in it (and the owner hasn't switched it off). */
+    get hasKeepsakes() { return boxOn(store.site); },
+    /** The music: never started by anything but her tap; mute and volume are remembered on this device. */
+    sound: {
+      get started() { return !!app.soundStarted; },
+      get muted() { return !!app.audio.muted; },
+      get volume() { return app.volume; },
+      start: () => app.startSound(),
+      toggleMute: () => { app.audio.toggleMute(); app.syncMute && app.syncMute(); return app.audio.muted; },
+      setVolume: (v) => setVolume(v),
+    },
   };
   ctx.openGallery = async (opts) => {
     const mod = await import('./scenes/gallery.js');
     const g = mod.openGallery(ctx, { ...opts, onClose: () => overlayClosed('album') });
     overlayOpened('album', () => g.close({ fromHistory: true }));
     return g;
+  };
+  // the Keepsake Box (core/keepsakes.js): a room inside it is one history step, so Back returns to the box
+  ctx.openKeepsakes = async (opts = {}) => {
+    if (app.openingBox || (app.overlay && app.overlay.name === 'keepsakes')) return null;
+    app.openingBox = true;
+    let mod;
+    try { mod = await import('./core/keepsakes.js'); } catch (err) { console.warn('[keepsakes] unavailable', err); return null; } finally { app.openingBox = false; }
+    if (ac.signal.aborted) return null;
+    const step = {
+      push() { try { history.pushState({ film: app.list[app.index]?.id, overlay: 'keepsakes', step: 1 }, ''); } catch { /* ignore */ } },
+      pop() { try { if (history.state && history.state.step) { ignorePop++; history.back(); } } catch { /* ignore */ } },
+    };
+    const k = mod.openKeepsakes(ctx, { ...opts, step, onClose: ({ steps = 1 } = {}) => overlayClosed('keepsakes', steps) });
+    overlayOpened('keepsakes', () => k.close({ fromHistory: true }), () => k.close({ fromHistory: true, quiet: true }), () => k.back());
+    return k;
   };
   return ctx;
 }
@@ -480,26 +511,37 @@ function rememberPlace(def, { fromHistory = false } = {}) {
 
 /* ---------------- overlays the browser's Back closes first (the album, the chapters) ---------------- */
 let ignorePop = 0;
-function overlayOpened(name, close, silent = null) {
+function overlayOpened(name, close, silent = null, back = null) {
   const film = app.list[app.index]?.id;
-  app.overlay = { name, close, silent };
+  app.overlay = { name, close, silent, back };
   try {
     // one overlay straight after another (the chapters list → every photo) shares one entry
     if (film && history.state && history.state.overlay) history.replaceState({ film, overlay: name }, '');
     else if (film) history.pushState({ film, overlay: name }, '');
   } catch { /* ignore */ }
 }
-/** The overlay closed itself (its ✕, Escape): take its history entry back off, quietly. */
-function overlayClosed(name) {
+/** The overlay closed itself (its ✕, Escape): take its history entry back off, quietly (and the step of a
+ *  Keepsake Box room still open, `steps` 2). */
+function overlayClosed(name, steps = 1) {
   if (!app.overlay || app.overlay.name !== name) return;
   app.overlay = null;
   try {
-    if (history.state && history.state.overlay === name) { ignorePop++; history.back(); }
+    if (history.state && history.state.overlay === name) {
+      ignorePop++;
+      if (steps > 1 && history.state.step) history.go(-steps); else history.back();
+    }
   } catch { /* ignore */ }
 }
 window.addEventListener('popstate', (e) => {
   if (ignorePop > 0) { ignorePop--; return; }
-  if (app.overlay) { const o = app.overlay; app.overlay = null; try { o.close(); } catch { /* ignore */ } return; }
+  if (app.overlay) {
+    const o = app.overlay;
+    // inside the Keepsake Box, Back first leaves the room she is in
+    try { if (o.back && o.back()) return; } catch { /* ignore */ }
+    app.overlay = null;
+    try { o.close(); } catch { /* ignore */ }
+    return;
+  }
   const id = e.state && e.state.film;
   if (!id) return;
   const i = app.list.findIndex((c) => c.id === id);
@@ -531,6 +573,7 @@ async function openChapters() {
     // picking a chapter: the list closes without going Back; the new chapter takes its history entry
     onPick: (i) => { app.overlay = null; app.startSound(); app.handoff = null; goTo(i); },
     onAlbum: () => app.current?.ctx.openGallery({ only: 'all' }),
+    onBox: app.finished && boxOn(app.store.site) ? () => app.current?.ctx.openKeepsakes() : null,
     onClose: () => overlayClosed('chapters'),
   });
   overlayOpened('chapters', () => list.close({ fromHistory: true }), () => list.close({ silent: true }));
@@ -564,6 +607,7 @@ function setupMute() {
     btn.title = app.audio.muted ? 'Sound is off (M)' : 'Mute sound (M)';
     btn.setAttribute('aria-pressed', app.audio.muted ? 'true' : 'false');
   };
+  app.syncMute = sync;
   // (a mouse or touch press doesn't leave focus on it, so Enter / Space still mean Continue afterwards)
   btn.addEventListener('click', (e) => { app.audio.toggleMute(); sync(); if (e.detail > 0) btn.blur(); });
   // M toggles the sound from anywhere (not while typing, and not before her first tap started it)
@@ -575,6 +619,17 @@ function setupMute() {
   });
   sync();
   app.showMute = () => { btn.hidden = false; gsap.fromTo(btn, { opacity: 0 }, { opacity: 0.7, duration: 1 }); sync(); };
+}
+
+/* ---------------- volume (the Keepsake Box's slider), remembered on this device ---------------- */
+const VOLUME_KEY = 'deepu-volume';
+function readVolume() {
+  try { const v = Number(localStorage.getItem(VOLUME_KEY)); return localStorage.getItem(VOLUME_KEY) != null && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1; } catch { return 1; }
+}
+function setVolume(v) {
+  app.volume = Math.min(1, Math.max(0, Number(v) || 0));
+  app.audio.setVolume(app.volume);
+  try { if (app.volume === 1) localStorage.removeItem(VOLUME_KEY); else localStorage.setItem(VOLUME_KEY, String(app.volume)); } catch { /* storage unavailable */ }
 }
 
 /** The chapters button (top left, the mute's mirror): where she is and the chapters she has seen. */
@@ -671,6 +726,8 @@ async function boot() {
   root.style.setProperty('--grain', String(0.075 * (theme.grain ?? 0.6) / 0.6));
 
   app.audio = await makeAudio(store.mediaUrl('music'));
+  app.volume = readVolume();
+  if (app.volume !== 1) app.audio.setVolume(app.volume);
   app.fx = createFX({ dustCanvas: document.getElementById('dust'), fxCanvas: document.getElementById('fx'), device, density: theme.particles ?? 1 });
   app.ui = createUI({ audio: app.audio, reducedMotion: device.reducedMotion });
   app.eggs = createEggs({ audio: app.audio, fx: app.fx });
@@ -736,15 +793,20 @@ async function boot() {
     return goTo(0, { instant: true });
   }
 
+  // an owner's preview link may open the Keepsake Box straight away (&box, or &box=<room>), over its chapter
+  const openBoxAfter = async (went) => {
+    if (went && PREVIEW && params.has('box') && app.current && boxOn(app.store.site)) await app.current.ctx.openKeepsakes({ room: params.get('box') || null });
+    return went;
+  };
   if (START_AT && PREVIEW) {
     const i = app.list.findIndex((c) => c.id === START_AT);
     if (i > 0) {
       // jumping straight in (testing): unlock audio on first tap
       window.addEventListener('pointerdown', () => { app.startSound(); }, { once: true });
-      return goTo(i, { instant: true });
+      return goTo(i, { instant: true }).then(openBoxAfter);
     }
   }
-  return goTo(0, { instant: true });
+  return goTo(0, { instant: true }).then(openBoxAfter);
 }
 
 // Leaving a chapter part-way (Back, the chapters list, Skip) aborts its pending waits: that AbortError is how

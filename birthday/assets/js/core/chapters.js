@@ -6,10 +6,10 @@ import { esc } from './art.js';
 
 /**
  * @param {{ items: {i:number,id:string,name:string,num:number|null,nav:boolean,seen:boolean,now:boolean}[], finished: boolean,
- *   reducedMotion: boolean, gsap: object, onPick: (i:number)=>void, onAlbum: ()=>void, onClose: ()=>void }} o
+ *   reducedMotion: boolean, gsap: object, onPick: (i:number)=>void, onAlbum: ()=>void, onBox?: (()=>void)|null, onClose: ()=>void }} o
  * @returns {{ close: (opts?: {fromHistory?: boolean}) => void, el: HTMLElement }}
  */
-export function openChapterList({ items, finished, reducedMotion, gsap, onPick, onAlbum, onClose }) {
+export function openChapterList({ items, finished, reducedMotion, gsap, onPick, onAlbum, onBox = null, onClose }) {
   const opener = document.activeElement;
   const list = items.filter((c) => c.nav);
   const wrap = document.createElement('div');
@@ -35,7 +35,7 @@ export function openChapterList({ items, finished, reducedMotion, gsap, onPick, 
       </div>
       <ol class="chl-list">${rows}</ol>
       <p class="chl-note">${finished ? 'Every chapter you have seen is one tap away.' : 'The chapters still ahead keep their names until you get there.'}</p>
-      ${finished ? '<div class="chl-foot"><button type="button" class="btn-ghost chl-album">Every photo</button></div>' : ''}
+      ${finished ? `<div class="chl-foot"><button type="button" class="btn-ghost chl-album">Every photo</button>${onBox ? '<button type="button" class="btn-ghost chl-box">The keepsake box</button>' : ''}</div>` : ''}
     </div>`;
   document.getElementById('ui').appendChild(wrap);
   const panel = wrap.querySelector('.chl-panel');
@@ -60,6 +60,7 @@ export function openChapterList({ items, finished, reducedMotion, gsap, onPick, 
     if (e.target.closest('.chl-close')) { close(); return; }
     // straight on to the album: the list steps aside quietly and the album takes its place (and its Back)
     if (e.target.closest('.chl-album')) { close({ silent: true }); onAlbum && onAlbum(); return; }
+    if (e.target.closest('.chl-box')) { close({ silent: true }); onBox && onBox(); return; }
     if (!e.target.closest('.chl-panel')) close(); // a tap outside the panel
   });
   function onKey(e) {

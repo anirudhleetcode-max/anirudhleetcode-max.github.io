@@ -1,0 +1,140 @@
+/* ============================================================ The Day We Met, From My Side (met) */
+/* A journal by lamplight: night above, a warm glow below, and his cards as pages in plum and gold. */
+.scene-met { overflow: hidden; background: radial-gradient(ellipse 130% 85% at 50% 0%, #3b1a57 0%, #24113d 42%, #160b26 72%, #0b0614 100%); }
+
+.mt-sky { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.mt-glow {
+  position: absolute; left: calc(50% - 75vmax); bottom: -34vmax; width: 150vmax; height: 80vmax; border-radius: 50%; /* (the camera writes its `translate`) */
+  background: radial-gradient(closest-side, rgba(255, 179, 71, .24), rgba(255, 159, 67, .1) 45%, rgba(255, 159, 67, 0) 75%);
+  animation: mt-breathe 9s ease-in-out infinite;
+}
+.mt-stars {
+  position: absolute; inset: 0; opacity: .8;
+  background-image:
+    radial-gradient(1.5px 1.5px at 8% 12%, #fff4e0, transparent), radial-gradient(1px 1px at 21% 31%, #ffe3a3, transparent),
+    radial-gradient(1.5px 1.5px at 34% 8%, #fff4e0, transparent), radial-gradient(1px 1px at 47% 22%, #d9c8f5, transparent),
+    radial-gradient(2px 2px at 63% 10%, #ffe3a3, transparent), radial-gradient(1px 1px at 72% 28%, #fff4e0, transparent),
+    radial-gradient(1.5px 1.5px at 86% 16%, #d9c8f5, transparent), radial-gradient(1px 1px at 94% 36%, #fff4e0, transparent),
+    radial-gradient(1px 1px at 4% 44%, #d9c8f5, transparent), radial-gradient(1.5px 1.5px at 92% 58%, #ffe3a3, transparent),
+    radial-gradient(1px 1px at 13% 66%, #fff4e0, transparent), radial-gradient(1px 1px at 55% 4%, #fff4e0, transparent);
+  animation: mt-twinkle 6s ease-in-out infinite alternate;
+}
+@keyframes mt-breathe { 0%, 100% { opacity: .85; transform: scale(1); } 50% { opacity: 1; transform: scale(1.04); } }
+@keyframes mt-twinkle { from { opacity: .55; } to { opacity: .9; } }
+
+/* the page area: below the top buttons, above Continue; a page taller than the screen scrolls here */
+.mt-scroll {
+  position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column;
+  overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: rgba(244, 196, 99, .35) transparent;
+  padding: calc(var(--safe-t) + 56px) calc(var(--safe-r) + 16px) calc(var(--safe-b) + var(--lb) + 3.4vh + 74px) calc(var(--safe-l) + 16px);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 46px, #000 calc(100% - 60px), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 46px, #000 calc(100% - 60px), transparent 100%);
+}
+.mt-scroll:focus, .mt-scroll:focus-visible { outline: none; }
+.mt-page { margin: auto 0; width: 100%; }
+
+/* ---------- a page ---------- */
+.mt-card {
+  position: relative; margin: 0 auto; width: min(100%, 620px);
+  padding: clamp(26px, 5vw, 42px) clamp(20px, 5.5vw, 46px) clamp(26px, 5vw, 40px);
+  border-radius: 6px 16px 16px 6px; /* the spine on the left */
+  border: 1px solid rgba(244, 196, 99, .34);
+  background:
+    linear-gradient(90deg, rgba(8, 4, 15, .38), rgba(8, 4, 15, 0) 22px),
+    radial-gradient(ellipse 90% 70% at 70% 100%, rgba(255, 179, 71, .1), rgba(255, 179, 71, 0) 70%),
+    linear-gradient(168deg, rgba(59, 26, 87, .92), rgba(36, 17, 61, .94) 55%, rgba(22, 11, 38, .96));
+  box-shadow: inset 0 0 0 7px rgba(22, 11, 38, .3), inset 0 0 0 8px rgba(244, 196, 99, .13), 0 30px 80px rgba(0, 0, 0, .5), 0 0 70px rgba(255, 179, 71, .08);
+  color: var(--cream); text-align: left;
+}
+.mt-card.has-photos { width: min(100%, 560px); }
+/* a ribbon bookmark */
+.mt-card::before {
+  content: ''; position: absolute; top: -5px; right: clamp(22px, 6vw, 40px); width: 14px; height: 50px;
+  background: linear-gradient(180deg, var(--gold-deep), var(--gold) 70%);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .3);
+}
+.mt-scroll:focus-visible .mt-card { box-shadow: inset 0 0 0 7px rgba(22, 11, 38, .3), inset 0 0 0 8px rgba(244, 196, 99, .13), 0 0 0 2px var(--gold-hi), 0 30px 80px rgba(0, 0, 0, .5); }
+
+.mt-body { min-width: 0; }
+.mt-count {
+  margin: 0 0 14px; padding-right: 40px; font-family: var(--f-caps); font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--lavender);
+}
+.mt-head {
+  margin: 0 0 .9em; padding-right: 32px; font-family: var(--f-caps); font-weight: 500; letter-spacing: .14em; line-height: 1.3;
+  font-size: clamp(14px, min(3.8vw, 2.6vh), 20px); color: var(--gold-hi); overflow-wrap: anywhere;
+}
+.mt-head::after {
+  content: ''; display: block; width: 64px; height: 1px; margin-top: .75em;
+  background: linear-gradient(90deg, rgba(244, 196, 99, .85), rgba(244, 196, 99, 0));
+}
+.mt-text p {
+  margin: 0 0 .55em; font-family: var(--f-serif); font-weight: 500; line-height: 1.4; overflow-wrap: anywhere;
+  font-size: clamp(20px, min(5.4vw, 3.6vh), 30px); color: var(--cream); text-wrap: pretty;
+}
+.mt-text p:last-child { margin-bottom: 0; }
+.mt-feel { margin-top: 1.2em; padding: 2px 0 2px 16px; border-left: 2px solid rgba(244, 196, 99, .5); }
+.mt-body > .mt-feel:first-child, .mt-count + .mt-feel { margin-top: 0; }
+.mt-feel-label { margin: 0 0 .5em; font-family: var(--f-caps); font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--gold); }
+.mt-feel-text p {
+  margin: 0 0 .45em; font-family: var(--f-serif); font-style: italic; font-weight: 500; line-height: 1.38; overflow-wrap: anywhere;
+  font-size: clamp(19px, min(5vw, 3.3vh), 27px); color: var(--lilac); text-wrap: pretty;
+}
+.mt-feel-text p:last-child { margin-bottom: 0; }
+
+/* his photos: real prints, never retouched — a paper border, a tilt and a shadow */
+.mt-photos { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: clamp(20px, 3.4vh, 30px); padding: 4px 0 6px; }
+.only-photos .mt-photos { margin-top: 0; }
+.mt-pol {
+  flex: 0 1 auto; margin: 0; width: min(78%, 300px, calc(44vh * var(--r, .75))); min-width: 0;
+  padding: 8px 8px 0; background: #fbf6ec; border-radius: 3px; rotate: var(--tilt, 0deg);
+  box-shadow: 0 18px 38px -14px rgba(0, 0, 0, .7), 0 3px 8px rgba(0, 0, 0, .35);
+}
+.is-two .mt-pol { width: min(calc(50% - 8px), 230px, calc(34vh * var(--r, .75))); }
+.mt-pol .ph { width: 100%; aspect-ratio: var(--r, .75); border-radius: 1px; background: #e9dccb; }
+.mt-pol img { transition: opacity var(--motion-slow) var(--ease-out); }
+.mt-pol img.is-wait { opacity: 0; }
+.mt-pol figcaption { padding: 6px 2px 10px; font-family: var(--f-hand); font-size: clamp(16px, 4vw, 20px); line-height: 1.1; color: #4a2a5c; text-align: center; overflow-wrap: anywhere; }
+.mt-pol:not(.has-cap) { padding-bottom: 26px; } /* a polaroid's chin */
+
+/* the intro and the end: his line(s), on their own */
+.mt-lines { max-width: 30em; margin: 0 auto; text-align: center; }
+.mt-line {
+  margin: 0 0 .45em; font-family: var(--f-serif); font-style: italic; font-weight: 500; line-height: 1.32; overflow-wrap: anywhere;
+  font-size: clamp(24px, min(6.4vw, 4.6vh), 42px); color: var(--cream); text-wrap: balance;
+  text-shadow: 0 0 18px rgba(255, 210, 140, .35), 0 2px 12px rgba(0, 0, 0, .8);
+}
+.mt-line:last-child { margin-bottom: 0; }
+
+/* wide screens: the page as a spread — his words on the left, the polaroids on the right */
+@media (orientation: landscape) and (min-width: 640px) {
+  .mt-card.has-photos:not(.only-photos) {
+    width: min(100%, 980px); display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); align-items: center;
+    column-gap: clamp(22px, 4vw, 52px);
+  }
+  .mt-card.has-photos:not(.only-photos) .mt-photos { margin-top: 0; }
+  .has-photos:not(.only-photos) .mt-pol { width: min(100%, 340px, calc(58vh * var(--r, .75))); }
+  .is-two:not(.only-photos) .mt-pol { width: min(calc(50% - 8px), 220px, calc(50vh * var(--r, .75))); }
+  .only-photos .mt-pol { width: min(60%, 360px, calc(58vh * var(--r, .75))); }
+  .only-photos.is-two .mt-pol { width: min(calc(50% - 8px), 300px, calc(52vh * var(--r, .75))); }
+}
+/* landscape phones: a little more room for the page between the top buttons and Continue */
+@media (orientation: landscape) and (max-height: 540px) {
+  .mt-scroll { padding-top: calc(var(--safe-t) + 50px); padding-bottom: calc(var(--safe-b) + var(--lb) + 3.4vh + 64px); }
+  .mt-card { padding: 22px clamp(20px, 4vw, 34px) 22px; }
+  .mt-count { margin-bottom: 8px; }
+  .mt-head { margin-bottom: .6em; }
+  .mt-pol figcaption { font-size: 15px; padding-bottom: 6px; }
+  .mt-pol:not(.has-cap) { padding-bottom: 18px; }
+  .mt-card .mt-pol { width: min(78%, 280px, calc(44vh * var(--r, .75))); }
+  .mt-card.is-two .mt-pol { width: min(calc(50% - 8px), 220px, calc(40vh * var(--r, .75))); }
+}
+@media (orientation: landscape) and (min-width: 640px) and (max-height: 540px) {
+  .mt-card.has-photos:not(.only-photos) .mt-pol { width: min(100%, 280px, calc(44vh * var(--r, .75))); }
+  .mt-card.is-two:not(.only-photos) .mt-pol { width: min(calc(50% - 8px), 200px, calc(40vh * var(--r, .75))); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mt-glow, .mt-stars { animation: none; }
+}
+.reduced-motion .mt-glow, .reduced-motion .mt-stars { animation: none; }

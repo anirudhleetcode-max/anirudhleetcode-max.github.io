@@ -62,6 +62,7 @@ export default {
         <p class="cr-end-sub">${esc(ctx.fill(t.endSub || ''))}</p>
         <div class="cr-actions">
           ${extras.length ? `<button type="button" class="btn-gold cr-more">${esc(ctx.fill(t.extrasTitle || 'More memories'))}</button>` : ''}
+          ${ctx.hasKeepsakes ? '<button type="button" class="btn-ghost cr-box">The keepsake box</button>' : ''}
           <button type="button" class="btn-ghost cr-album">Every photo</button>
           <button type="button" class="btn-ghost cr-again">↺ &nbsp;Watch again</button>
         </div>
@@ -166,6 +167,8 @@ export default {
     const more = end.querySelector('.cr-more');
     more && more.addEventListener('click', () => ctx.openGallery({ only: 'extras' }));
     end.querySelector('.cr-album').addEventListener('click', () => ctx.openGallery({ only: 'all' }));
+    const boxBtn = end.querySelector('.cr-box');
+    boxBtn && boxBtn.addEventListener('click', () => ctx.openKeepsakes());
     end.querySelector('.cr-again').addEventListener('click', () => ctx.restart());
     gsap.fromTo(theEnd, { opacity: 0, filter: 'blur(12px)', letterSpacing: '0.4em' }, { opacity: 1, filter: 'blur(0px)', letterSpacing: '0.12em', duration: 2.6, ease: 'power3.out' });
     await ctx.wait(2.6);
@@ -216,7 +219,7 @@ export default {
     wait.addEventListener('click', postCredits);
     // the post-credits scene waits for her: never behind the album or the chapters list (it starts a few
     // seconds after she closes them)
-    const overlayOpen = () => !!document.querySelector('#ui .gal, #ui .chl');
+    const overlayOpen = () => !!document.querySelector('#ui .gal, #ui .chl, #ui .ks');
     let sawOverlay = false;
     const tryPost = () => {
       if (posted || ctx.signal.aborted) return;

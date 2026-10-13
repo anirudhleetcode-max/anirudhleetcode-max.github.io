@@ -24,12 +24,14 @@ import { renderPreview } from './sections/preview.js';
 import { renderSettings } from './sections/settings.js';
 import { renderHelp } from './sections/help.js';
 import { renderOverview } from './sections/overview.js';
+import { renderKeepsakes } from './sections/keepsakes.js';
 
 const SECTIONS = [
   { id: 'overview', label: 'Overview', icon: 'grid', render: renderOverview },
   { id: 'library', label: 'Photo library', short: 'Photos', icon: 'images', render: renderLibrary, primary: true },
   { id: 'chapters', label: 'Chapters', icon: 'film', render: renderChapters, primary: true },
   { id: 'messages', label: 'Messages', icon: 'quote', render: renderMessages, primary: true },
+  { id: 'keepsakes', label: 'Keepsake Box', icon: 'star', render: renderKeepsakes },
   { id: 'audio', label: 'Audio', icon: 'music', render: renderAudio },
   { id: 'video', label: 'Video', icon: 'video', render: renderVideo },
   { id: 'theme', label: 'Theme', icon: 'palette', render: renderTheme },

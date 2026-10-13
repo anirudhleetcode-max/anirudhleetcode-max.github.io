@@ -36,17 +36,21 @@ function setupVoice(el, { voice, audio, labels, signal }) {
     ducked = on;
     try { audio.duck(on ? 0.1 : 1, on ? 3600 : 0.1); } catch { /* sound is optional */ }
   };
-  // its words say what a press does (Play / Pause / again), so it is a plain button, not a toggle
+  // its words say what a press does (Play / Pause / again), so it is a plain button, not a toggle;
+  // between her press and the first sound (and whenever it waits for more of the file) it says “Loading…”
   const show = (state) => {
-    label.textContent = state === 'playing' ? labels.pause : state === 'ended' ? labels.again : labels.play;
+    label.textContent = state === 'playing' ? labels.pause : state === 'loading' ? labels.loading : state === 'ended' ? labels.again : labels.play;
     btn.dataset.state = state;
+    if (state === 'loading') btn.setAttribute('aria-busy', 'true'); else btn.removeAttribute('aria-busy');
     wrap.classList.toggle('is-playing', state === 'playing');
+    wrap.classList.toggle('is-loading', state === 'loading');
   };
   const fail = () => {
     if (failed) return;
     failed = true;
     duck(false);
     a.removeAttribute('src');
+    btn.removeAttribute('aria-busy');
     btn.hidden = true;
     wrap.querySelector('.lt-voice-bar').hidden = true;
     time.hidden = true;
@@ -58,6 +62,7 @@ function setupVoice(el, { voice, audio, labels, signal }) {
   wrap.hidden = false;
   show('idle');
   a.addEventListener('playing', () => { duck(true); show('playing'); });
+  a.addEventListener('waiting', () => { if (!a.paused && !failed) show('loading'); });
   a.addEventListener('pause', () => { duck(false); if (!a.ended) show('idle'); });
   a.addEventListener('ended', () => { duck(false); show('ended'); bar.style.transform = 'scaleX(1)'; });
   a.addEventListener('error', fail);
@@ -72,8 +77,13 @@ function setupVoice(el, { voice, audio, labels, signal }) {
   a.addEventListener('loadedmetadata', tick);
   btn.addEventListener('click', () => {
     if (failed) return;
-    if (a.paused) a.play().catch((err) => { if (err && err.name !== 'AbortError') fail(); });
-    else a.pause();
+    if (a.paused) {
+      show('loading');
+      a.play().catch((err) => {
+        if (err && err.name !== 'AbortError') fail();
+        else if (a.paused && !failed) show(a.ended ? 'ended' : 'idle'); // stopped before it began (a pause, a hidden tab)
+      });
+    } else a.pause();
   });
   // a hidden tab pauses it (she taps to go on)
   const onHide = () => { if (document.hidden && !a.paused) a.pause(); };
@@ -104,6 +114,7 @@ export default {
       play: ctx.fill(String(t.voicePlay || '')).trim() || '▶  Hear it in my voice',
       pause: ctx.fill(String(t.voicePause || '')).trim() || '❚❚  Pause',
       again: ctx.fill(String(t.voiceAgain || '')).trim() || '▶  Hear it again',
+      loading: 'Loading…',
     };
     // paragraphs built on a memory that hasn't been written yet fill to '' and are left out
     const body = (t.body || []).filter(Boolean).map((b) => ctx.fill(b)).filter(Boolean);
@@ -139,12 +150,14 @@ export default {
             ${pin(pics[2], 2)}
             <p class="lt-sign">${esc(ctx.fill(t.signoff || from.signoff || ''))}</p>
             <p class="lt-from">${esc(ctx.fill(from.name || ''))}</p>
+            <p class="lt-flourish" aria-hidden="true"><i></i><span>✦</span><i></i></p>
             ${ps ? `<p class="lt-p lt-ps">${esc(ps)}</p>` : ''}
             ${voice ? `<div class="lt-voice-wrap" hidden><button type="button" class="btn-ghost lt-voice" data-state="idle"><span class="lt-voice-label">${esc(voiceLabels.play)}</span></button><div class="lt-voice-bar" aria-hidden="true"><i></i></div><span class="lt-voice-time" aria-hidden="true"></span><p class="lt-voice-note" role="status"></p></div>` : ''}
             ${pressedFlower()}
           </div>
         </div>
-      </div>`;
+      </div>
+      <p class="lt-live sr-only" role="status" aria-live="polite"></p>`;
 
     const env = el.querySelector('.lt-env');
     const seal = el.querySelector('.lt-seal');
@@ -263,6 +276,7 @@ export default {
     let scripted = false;
     let away = false;
     let jumping = false; // "Show it all" in progress
+    let paused = false; // "Pause": the pen and its scrolling wait until she presses "Keep writing"
     let lastTop = 0;
     const atHead = () => {
       if (!lastChar || scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 8) return true;
@@ -296,7 +310,7 @@ export default {
     };
     // keep the newest line in view while writing
     const keepUp = setInterval(() => {
-      if (lastChar && !away) {
+      if (lastChar && !away && !paused) {
         const r = lastChar.getBoundingClientRect();
         const sr2 = scroller.getBoundingClientRect();
         if (r.bottom > sr2.bottom - sr2.height * 0.22) glide(scroller.scrollTop + (r.bottom - (sr2.bottom - sr2.height * 0.45)), 1.2);
@@ -306,9 +320,11 @@ export default {
 
     await ctx.wait(reduced ? 0.4 : 1.2);
     // tap the letter to write faster; "Show it all" writes the rest at once (also by keyboard)
-    const faster = (e) => { if (e.target.closest('button')) return; tl.timeScale(Math.min(8, tl.timeScale() * 2.5)); };
+    // (never while paused: only "Keep writing" starts the pen again)
+    const faster = (e) => { if (paused || e.target.closest('button')) return; tl.timeScale(Math.min(8, tl.timeScale() * 2.5)); };
     // writes the rest at once where she is reading: no scroll down to the sign-off, no burst of chimes
     function showAll() {
+      if (paused) { paused = false; tl.paused(false); }
       jumping = true;
       tl.progress(1);
       jumping = false;
@@ -317,17 +333,40 @@ export default {
       pins.forEach((pin, k) => gsap.set(pin, { opacity: 1, y: 0, rotation: k % 2 ? -4 : 6, scale: 1 }));
     }
     let allBtn = null;
+    let pauseBtn = null;
+    let ctrls = null;
     let hint = null;
+    // "Pause" ⇄ "Keep writing": the pen and the scrolling stop right where they are (a toggle: aria-pressed)
+    const setPaused = (on) => {
+      if (on === paused || tl.progress() >= 1) return;
+      paused = on;
+      if (on) {
+        tl.pause();
+        gsap.killTweensOf(scroller, 'scrollTop');
+        scripted = false;
+      } else tl.resume();
+      pauseBtn.textContent = on ? 'Keep writing' : 'Pause';
+      pauseBtn.setAttribute('aria-pressed', String(on));
+    };
     if (!reduced) {
       paper.addEventListener('click', faster);
       hint = ui.hint(t.fasterHint || 'Tap the letter to write faster');
       setTimeout(() => hint.remove(), 4500);
+      ctrls = document.createElement('div');
+      ctrls.className = 'lt-ctrls';
+      pauseBtn = document.createElement('button');
+      pauseBtn.type = 'button';
+      pauseBtn.className = 'lt-pause';
+      pauseBtn.textContent = 'Pause';
+      pauseBtn.setAttribute('aria-pressed', 'false');
       allBtn = document.createElement('button');
       allBtn.type = 'button';
       allBtn.className = 'lt-all';
       allBtn.textContent = ctx.fill(String(t.showAll || '')).trim() || 'Show it all';
-      el.appendChild(allBtn);
-      gsap.fromTo(allBtn, { opacity: 0 }, { opacity: 1, duration: 0.8, delay: 0.6 });
+      ctrls.append(pauseBtn, allBtn);
+      el.appendChild(ctrls);
+      gsap.fromTo(ctrls, { opacity: 0 }, { opacity: 1, duration: 0.8, delay: 0.6 });
+      pauseBtn.addEventListener('click', () => setPaused(!paused));
       allBtn.addEventListener('click', showAll);
     }
     // by keyboard: Enter (or Space, away from a button) writes the rest at once, like "Show it all"
@@ -342,10 +381,20 @@ export default {
     ctx.signal.addEventListener('abort', () => window.removeEventListener('keydown', onKey), { once: true });
     tl.play();
     await tl.then();
+    if (ctx.signal.aborted) return;
     window.removeEventListener('keydown', onKey);
     clearInterval(keepUp);
     paper.removeEventListener('click', faster);
-    if (allBtn) gsap.to(allBtn, { opacity: 0, duration: 0.4, onComplete: () => allBtn.remove() });
+    if (ctrls) {
+      ctrls.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+      gsap.to(ctrls, { opacity: 0, duration: 0.4, onComplete: () => ctrls.remove() });
+    }
+    // the whole letter is there: a quiet ornament under the signature, and screen readers hear that it's done
+    const flourish = el.querySelector('.lt-flourish');
+    if (reduced) gsap.set(flourish, { opacity: 1 });
+    else gsap.fromTo(flourish, { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 1.2, ease: 'back.out(1.7)' });
+    const live = el.querySelector('.lt-live');
+    setTimeout(() => { if (!ctx.signal.aborted) live.textContent = 'The letter is complete.'; }, 60);
     audio.sfx('sparkle');
     await ctx.wait(1.5);
     await ui.waitContinue('Keep going');

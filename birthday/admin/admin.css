@@ -929,3 +929,51 @@ details.fs[open] > summary::after { content: "−"; }
 .panel-body, .field { grid-template-columns: minmax(0, 1fr); }
 .input { min-width: 0; }
 .panel-body .btn { max-width: 100%; white-space: normal; }
+
+/* ---------- photo picker (cards in “The day we met”) ---------- */
+.pick-photos { display: grid; gap: 8px; }
+.pick-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.pick-item { position: relative; }
+.pick-remove { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; min-height: 0; padding: 0; border-radius: 50%; }
+.pick-missing { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 10px; border: 1px dashed var(--line-2); color: var(--text-3); }
+.pick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.pick-group + .pick-group { margin-top: 14px; }
+.pick-head { margin: 0 0 8px; font: 600 13px/1.3 var(--ui); color: var(--text-2); }
+.pick-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.pick-tile { position: relative; display: block; width: 100%; aspect-ratio: 1; padding: 0; border-radius: 10px; overflow: hidden; cursor: pointer; border: 2px solid transparent; background: rgba(8, 4, 15, 0.5); }
+.pick-tile[aria-pressed="true"] { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(244, 196, 99, 0.35); }
+.pick-check { position: absolute; right: 6px; top: 6px; width: 24px; height: 24px; border-radius: 50%; display: none; place-items: center; background: var(--gold); color: #2b1406; }
+.pick-tile[aria-pressed="true"] .pick-check { display: grid; }
+.pick-check .icon svg { width: 14px; height: 14px; }
+.pick-tile .mem-thumb-frame { height: 100%; }
+
+/* ---------- Keepsake Box section ---------- */
+.ks-admin-count { margin: 8px 0 4px; font: 600 14px/1.4 var(--ui); color: var(--gold-hi); }
+.ks-admin-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
+.ks-admin-room { padding: 14px 16px; border-radius: 16px; border: 1px solid var(--line-2); background: var(--card-bg); }
+.ks-admin-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ks-admin-titles { display: grid; gap: 4px; min-width: 0; }
+.ks-admin-title { margin: 0; font: 600 17px/1.25 var(--serif); color: var(--text); }
+.ks-admin-titles .muted { margin: 0; }
+.ks-state { justify-self: start; }
+.ks-state.is-on { color: #10251a; background: var(--ok); border-color: transparent; }
+.ks-state.is-wait { color: var(--gold-hi); border-color: var(--gold-line); border-style: dashed; }
+.ks-state.is-off { color: var(--text-3); border-style: dashed; }
+.ks-room-switch { flex: none; }
+.ks-admin-room details.group { margin-top: 10px; }
+.ks-admin-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+/* ---------- Overview · content readiness ---------- */
+.ready { margin: 6px 0 18px; }
+.ready-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ready-row { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: start; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: rgba(11, 6, 20, 0.45); }
+.ready-row > .icon { margin-top: 2px; }
+.ready-row.is-ok > .icon { color: var(--ok); }
+.ready-row.is-todo > .icon { color: var(--gold); }
+.ready-row.is-problem > .icon { color: #ff9a8b; }
+.ready-title { margin: 0; font: 600 14.5px/1.35 var(--ui); color: var(--text); }
+.ready-detail { grid-column: 2; margin: 0; font: 400 13.5px/1.45 var(--ui); color: var(--text-2); }
+.ready-detail ul { margin: 4px 0 0; padding-left: 18px; }
+.ready-actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.live-check[data-state="live"] { color: var(--ok); }
+.live-check[data-state="late"], .live-check[data-state="error"] { color: #ff9a8b; }

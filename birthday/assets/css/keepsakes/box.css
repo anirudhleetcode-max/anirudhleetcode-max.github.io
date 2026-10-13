@@ -1,0 +1,188 @@
+/* The Keepsake Box (core/keepsakes.js): the box itself, its colour worlds, and what every room shares.
+   Each room adds its own sheet (keepsakes/<room>.css), loaded the first time it opens.
+   Colour worlds are only variables: a room uses var(--ks-…) and never a fixed colour for text or lines. */
+
+.ks {
+  /* night (the film's own colours) */
+  --ks-scrim: rgba(8, 4, 15, .8);
+  --ks-bg: linear-gradient(180deg, rgba(36, 17, 61, .97), rgba(16, 8, 30, .98));
+  --ks-head: #22103a;
+  --ks-surface: rgba(255, 244, 224, .05);
+  --ks-surface-2: rgba(255, 244, 224, .09);
+  --ks-ink: #fff4e0;
+  --ks-soft: #d9c8f5;
+  --ks-accent: #f4c463;
+  --ks-accent-ink: #2a1238;
+  --ks-line: rgba(244, 196, 99, .38);
+  --ks-focus: #ffe3a3;
+  --ks-paper: #fbf6ec;
+  --ks-paper-ink: #3a2147;
+  --ks-paper-accent: #7a4a12;
+  --ks-shadow: 0 30px 80px rgba(0, 0, 0, .55);
+  --ks-title-font: var(--f-script);
+  position: absolute; inset: 0; z-index: 63; display: grid; place-items: center; pointer-events: auto;
+  padding: calc(var(--safe-t) + 12px) calc(var(--safe-r) + 12px) calc(var(--safe-b) + 12px) calc(var(--safe-l) + 12px);
+  background: var(--ks-scrim); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  color: var(--ks-ink); font-family: var(--f-serif);
+}
+.ks[data-world="paper"] {
+  --ks-scrim: rgba(23, 23, 23, .55);
+  --ks-bg: #f4f2ed;
+  --ks-head: #f4f2ed;
+  --ks-surface: rgba(23, 23, 23, .04);
+  --ks-surface-2: rgba(181, 72, 45, .08);
+  --ks-ink: #171717;
+  --ks-soft: #4a4744;
+  --ks-accent: #b5482d;
+  --ks-accent-ink: #ffffff;
+  --ks-line: rgba(23, 23, 23, .2);
+  --ks-focus: #b5482d;
+  --ks-paper: #ffffff;
+  --ks-paper-ink: #171717;
+  --ks-paper-accent: #a13f27;
+  --ks-shadow: 0 24px 60px rgba(0, 0, 0, .25);
+}
+.ks[data-world="dawn"] {
+  --ks-scrim: rgba(40, 18, 40, .55);
+  --ks-bg: linear-gradient(180deg, #fff2e6, #fbe3e0 60%, #efdcf0);
+  --ks-head: #fff0e5;
+  --ks-surface: rgba(90, 36, 70, .05);
+  --ks-surface-2: rgba(166, 58, 98, .09);
+  --ks-ink: #2f1630;
+  --ks-soft: #5e3b58;
+  --ks-accent: #a63a62;
+  --ks-accent-ink: #ffffff;
+  --ks-line: rgba(90, 36, 70, .22);
+  --ks-focus: #a63a62;
+  --ks-paper: #fffaf4;
+  --ks-paper-ink: #2f1630;
+  --ks-paper-accent: #9b3359;
+  --ks-shadow: 0 24px 60px rgba(60, 20, 50, .25);
+}
+.ks[data-world="garden"] {
+  --ks-scrim: rgba(4, 14, 10, .78);
+  --ks-bg: linear-gradient(180deg, #13291f, #0b1a14);
+  --ks-head: #13291f;
+  --ks-surface: rgba(240, 247, 236, .05);
+  --ks-surface-2: rgba(240, 247, 236, .09);
+  --ks-ink: #f1f7ee;
+  --ks-soft: #bcd4c2;
+  --ks-accent: #e9c25b;
+  --ks-accent-ink: #13291f;
+  --ks-line: rgba(233, 194, 91, .35);
+  --ks-focus: #f6dc8c;
+  --ks-paper: #fbf8ef;
+  --ks-paper-ink: #1d3328;
+  --ks-paper-accent: #6b5212;
+  --ks-shadow: 0 30px 80px rgba(0, 0, 0, .5);
+}
+
+.ks-panel {
+  position: relative; width: min(720px, 100%); max-height: 100%; overflow-y: auto; overscroll-behavior: contain;
+  padding: 16px 18px 22px; border-radius: 20px; outline: none;
+  background: var(--ks-bg); border: 1px solid var(--ks-line); box-shadow: var(--ks-shadow);
+  -webkit-overflow-scrolling: touch;
+}
+.ks.in-room .ks-panel { height: 100%; }
+.ks :focus-visible { outline: 2px solid var(--ks-focus); outline-offset: 2px; }
+/* a dark halo under the ring: it stays visible on light paper in the dark worlds, and on dark sky in the light ones */
+.ks :focus-visible { box-shadow: 0 0 0 4px rgba(20, 10, 30, .55); }
+
+.ks-head { position: sticky; top: -16px; z-index: 2; display: flex; align-items: flex-start; gap: 10px; margin: -16px -18px 6px; padding: 14px 18px 8px; background: var(--ks-head); box-shadow: 0 1px 0 var(--ks-line); border-radius: 20px 20px 0 0; }
+.ks-titles { flex: 1; min-width: 0; }
+.ks-kicker { margin: 0; font-family: var(--f-caps); font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--ks-soft); }
+.ks-title { margin: 2px 0 0; font-family: var(--ks-title-font); font-weight: 400; font-size: clamp(30px, 8vw, 44px); line-height: 1.08; color: var(--ks-accent); overflow-wrap: anywhere; }
+.ks.in-room .ks-title { font-family: var(--f-serif); font-style: italic; font-size: clamp(22px, 5.6vw, 30px); color: var(--ks-ink); }
+.ks-close, .ks-back {
+  flex: none; min-height: 44px; border-radius: 999px; cursor: pointer; color: var(--ks-ink);
+  border: 1px solid var(--ks-line); background: var(--ks-surface-2); font: inherit;
+}
+.ks-close { width: 44px; font-size: 18px; }
+.ks-back { order: -1; padding: 0 14px 0 10px; font-family: var(--f-caps); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; align-self: center; }
+.ks-back span { font-size: 20px; line-height: 0; vertical-align: -2px; margin-right: 2px; }
+.ks.in-room .ks-head { flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.ks.in-room .ks-titles { order: 3; flex: 1 1 100%; padding: 2px 2px 0; }
+
+.ks-intro { margin: 2px 2px 14px; font-style: italic; font-size: 18px; line-height: 1.4; color: var(--ks-soft); }
+.ks-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 10px; }
+.ks-tile {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 12px; border-radius: 14px; cursor: pointer; text-align: left;
+  color: var(--ks-ink); background: var(--ks-surface); border: 1px solid var(--ks-line); font: inherit;
+  transition: background-color var(--motion-fast) ease, border-color var(--motion-fast) ease, translate var(--motion-fast) var(--ease-settle);
+}
+.ks-tile:hover { background: var(--ks-surface-2); border-color: var(--ks-accent); }
+html:not(.reduced-motion) .ks-tile:hover { translate: 0 -2px; }
+.ks-ic { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; border: 1px solid var(--ks-line); color: var(--ks-accent); }
+.ks-ic svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.ks-tile-text { display: grid; gap: 2px; min-width: 0; }
+.ks-tile-title { font-size: 18px; line-height: 1.2; overflow-wrap: anywhere; }
+.ks-tile-line { font-size: 14.5px; font-style: italic; color: var(--ks-soft); line-height: 1.25; }
+
+.ks-settings { display: grid; gap: 14px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--ks-line); }
+.ks-set-label { margin: 0 0 8px; font-family: var(--f-caps); font-size: 11px; letter-spacing: .24em; text-transform: uppercase; color: var(--ks-soft); }
+.ks-set-note { letter-spacing: .06em; text-transform: none; font-family: var(--f-serif); font-style: italic; font-size: 13px; }
+.ks-worlds { display: flex; flex-wrap: wrap; gap: 8px; }
+.ks-world, .ks-world-reset, .ks-sound-btn {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px; cursor: pointer;
+  color: var(--ks-ink); background: var(--ks-surface); border: 1px solid var(--ks-line); font: inherit; font-size: 15.5px;
+}
+.ks-world i { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, .25); }
+.ks-world[data-world="night"] i { background: linear-gradient(135deg, #24113d, #f4c463); }
+.ks-world[data-world="paper"] i { background: linear-gradient(135deg, #f4f2ed 50%, #b5482d 50%); }
+.ks-world[data-world="dawn"] i { background: linear-gradient(135deg, #fbe3e0, #a63a62); }
+.ks-world[data-world="garden"] i { background: linear-gradient(135deg, #13291f, #e9c25b); }
+.ks-world[aria-pressed="true"] { border-color: var(--ks-accent); background: var(--ks-surface-2); box-shadow: 0 0 0 1px var(--ks-accent) inset; }
+.ks-world-reset { font-style: italic; color: var(--ks-soft); }
+.ks-sound-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.ks-sound-btn[aria-pressed="true"] { border-color: var(--ks-accent); }
+.ks-vol-wrap { display: flex; align-items: center; min-height: 44px; flex: 1 1 140px; max-width: 260px; }
+.ks-vol { width: 100%; accent-color: var(--ks-accent); }
+.ks-vol:disabled { opacity: .45; }
+.ks-sound-status { font-style: italic; font-size: 15px; color: var(--ks-soft); min-width: 3ch; }
+
+/* ---------- what every room shares ---------- */
+.ks-room-host { padding-top: 4px; }
+.ks-room { display: grid; gap: 14px; }
+.ks-room p { margin: 0; }
+.ks-lead { font-style: italic; font-size: 18px; line-height: 1.45; color: var(--ks-soft); }
+.ks-empty { font-style: italic; font-size: 17px; color: var(--ks-soft); text-align: center; padding: 18px 8px; }
+.ks-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 20px; border-radius: 999px; cursor: pointer;
+  font-family: var(--f-caps); font-size: 12px; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--ks-accent-ink); background: var(--ks-accent); border: 1px solid var(--ks-accent);
+}
+.ks-btn.is-quiet { color: var(--ks-ink); background: var(--ks-surface); border-color: var(--ks-line); }
+.ks-btn:disabled { opacity: .5; cursor: default; }
+.ks-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.ks-card { padding: 14px 16px; border-radius: 14px; background: var(--ks-surface); border: 1px solid var(--ks-line); }
+.ks-card h3 { margin: 0 0 6px; font-family: var(--f-serif); font-weight: 600; font-size: 19px; line-height: 1.25; color: var(--ks-ink); }
+.ks-card p { font-size: 17.5px; line-height: 1.5; color: var(--ks-ink); white-space: pre-line; overflow-wrap: anywhere; }
+.ks-small { font-size: 14.5px; font-style: italic; color: var(--ks-soft); }
+.ks-photo { position: relative; overflow: hidden; border-radius: 6px; background: var(--ks-surface-2); }
+.ks-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+
+@media (max-width: 520px) {
+  .ks-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ks-tile { flex-direction: column; align-items: flex-start; gap: 8px; min-height: 104px; padding: 12px; }
+  .ks-tile-line { display: none; }
+  .ks-tile-title { font-size: 16.5px; }
+}
+@media (max-width: 420px) {
+  .ks { padding: calc(var(--safe-t) + 6px) calc(var(--safe-r) + 6px) calc(var(--safe-b) + 6px) calc(var(--safe-l) + 6px); }
+  .ks-panel { padding: 14px 14px 18px; border-radius: 16px; }
+  .ks-head { margin: -14px -14px 6px; padding: 12px 14px 8px; }
+  .ks-back { padding: 0 10px 0 8px; letter-spacing: .1em; }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  /* inside a room the header stays on one line, so the room keeps most of the short screen */
+  .ks.in-room .ks-head { flex-wrap: nowrap; }
+  .ks.in-room .ks-titles { order: 0; flex: 1 1 auto; padding: 0; }
+  .ks.in-room .ks-kicker { display: none; }
+  .ks.in-room .ks-title { font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ks-panel { width: min(860px, 100%); padding-top: 10px; }
+  .ks-head { top: -10px; margin-top: -10px; padding-top: 8px; }
+  .ks-title { font-size: 28px; }
+  .ks-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .ks-tile { min-height: 54px; }
+}
+html.reduced-motion .ks-tile { transition: none; }

@@ -1,0 +1,47 @@
+/* A message I was too shy to say (keepsakes/shy.js): a folded note, then the paper, written by hand. */
+.ks-room-shy [hidden] { display: none !important; }
+.ks-room-shy [tabindex="-1"] { outline: none; }
+
+.sh-stage { display: grid; justify-items: center; gap: 18px; padding: 6px 0 4px; min-width: 0; }
+.sh-folded { display: grid; justify-items: center; gap: 20px; }
+
+/* the folded note (decoration; the button is how it opens) */
+.sh-fold {
+  position: relative; width: min(230px, 66vw); aspect-ratio: 4 / 3; border-radius: 6px; cursor: pointer; rotate: -2deg;
+  background: var(--ks-paper); box-shadow: 0 16px 34px rgba(0, 0, 0, .28);
+}
+.sh-fold::after { /* the crease */
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 10px; translate: 0 -50%;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--ks-paper-ink) 12%, transparent) 50%, transparent);
+}
+.sh-fold-flap {
+  position: absolute; left: 0; right: 0; top: 0; height: 50%; border-radius: 6px 6px 2px 2px; transform-origin: 50% 100%;
+  transform: perspective(380px) rotateX(16deg);
+  background: linear-gradient(to bottom, var(--ks-paper), color-mix(in srgb, var(--ks-paper) 86%, var(--ks-paper-ink)));
+  box-shadow: 0 -1px 0 color-mix(in srgb, var(--ks-paper-ink) 10%, transparent) inset;
+}
+.sh-seal {
+  position: absolute; left: 50%; top: 50%; z-index: 1; width: 30px; height: 30px; translate: -50% -50%; border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, color-mix(in srgb, var(--ks-accent) 55%, var(--ks-paper)), var(--ks-accent) 70%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .25);
+}
+.sh-seal::after { /* a small four-point star pressed into it */
+  content: ''; position: absolute; inset: 8px; background: var(--ks-accent-ink); opacity: .55;
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+}
+html.reduced-motion .sh-fold { rotate: 0deg; }
+
+/* the paper, unfolded */
+.sh-paper {
+  position: relative; width: min(560px, 100%); padding: clamp(22px, 6vw, 38px) clamp(20px, 6vw, 40px); border-radius: 12px; outline: none;
+  color: var(--ks-paper-ink); background: var(--ks-paper); box-shadow: 0 20px 44px rgba(0, 0, 0, .3);
+}
+.sh-paper::before { /* the crease it keeps */
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 6px; translate: 0 -50%; pointer-events: none;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--ks-paper-ink) 5%, transparent) 50%, transparent);
+}
+.sh-text {
+  position: relative; font-family: var(--f-hand); font-size: clamp(22px, 5.8vw, 27px); line-height: 1.35; color: var(--ks-paper-ink);
+  white-space: pre-line; overflow-wrap: anywhere;
+}
+.sh-after { max-width: 34em; text-align: center; font-style: italic; font-size: 17.5px; line-height: 1.45; color: var(--ks-soft); overflow-wrap: anywhere; }

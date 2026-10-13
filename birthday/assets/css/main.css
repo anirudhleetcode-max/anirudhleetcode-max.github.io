@@ -317,7 +317,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .is-ahead .chl-item { color: rgba(217, 200, 245, .45); }
 .is-ahead .chl-n { color: rgba(217, 200, 245, .5); border-color: rgba(185, 163, 227, .25); }
 .chl-note { margin: 12px 4px 0; font-style: italic; font-size: 16px; color: var(--lavender); opacity: .85; }
-.chl-foot { margin-top: 14px; display: flex; justify-content: center; }
+.chl-foot { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 
 /* ---------- A chapter that didn't arrive (a dropped connection) ---------- */
 .load-fail {

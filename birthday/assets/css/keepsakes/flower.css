@@ -1,0 +1,85 @@
+/* A birthday flower (keepsakes/flower.js): petals that are buttons, round a golden core, on a stem. */
+.ks-room-flower [hidden] { display: none !important; }
+.fl-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.fl-g0 { stop-color: color-mix(in srgb, var(--ks-accent) 42%, var(--ks-paper)); }
+.fl-g1 { stop-color: var(--ks-accent); }
+
+/* --fs-min (set by the room): 200px, more with many petals so each petal keeps a full-size tap area */
+.fl-wrap { --fs: min(340px, max(var(--fs-min, 200px), 46vh)); display: grid; gap: 12px; justify-items: center; min-width: 0; }
+.fl-stage { position: relative; width: min(100%, var(--fs)); aspect-ratio: 1 / 1.2; container-type: inline-size; }
+.fl-head { position: absolute; left: 0; top: 0; width: 100%; aspect-ratio: 1; }
+
+/* the stem and its leaves (decoration) */
+.fl-stem { position: absolute; left: 0; top: 41.6%; width: 100%; height: 58.4%; overflow: visible; }
+.fl-stalk { fill: none; stroke: #79a96a; stroke-width: 4px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.fl-leaf { fill: #8bb878; stroke: #5f8f52; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+
+/* the soft under-petals: they make it a flower however many lines there are; not buttons, never bright.
+   Each one (like each petal's arm) is a narrow box from the rim to the centre, turned about the centre, so
+   nothing turned ever reaches past the flower's own square. */
+.fl-unders { position: absolute; inset: 0; pointer-events: none; }
+.fl-under { position: absolute; left: 50%; top: 14%; width: 13%; height: 36%; translate: -50% 0; transform-origin: 50% 100%; rotate: var(--a); }
+.fl-under::before {
+  content: ''; position: absolute; left: 0; top: 0; width: 100%; height: 78%;
+  border-radius: 50% 50% 46% 46% / 60% 60% 40% 40%; background: color-mix(in srgb, var(--ks-accent) 16%, transparent);
+}
+
+/* the petals: real buttons, each on an arm turned to its place round the core */
+.fl-arm { position: absolute; left: 50%; top: 3%; width: var(--pw); min-width: 44px; height: 47%; translate: -50% 0; transform-origin: 50% 100%; rotate: var(--a); pointer-events: none; }
+.fl-petal {
+  position: absolute; left: 0; top: 0; width: 100%; height: 87%; padding: 0; margin: 0;
+  border: 0; border-radius: 50% / 42%; background: none; cursor: pointer; pointer-events: none; color: inherit; -webkit-tap-highlight-color: transparent;
+}
+/* where a petal takes a tap: its button's box, cut to its own slice of the flower (half-angle atan(--slice)), so
+   neighbouring petals never share a point. 1cqw is 1% of the flower; the button runs from 47% (the rim) to 6.11%
+   (just outside the core) of the flower's width away from its centre. */
+.fl-hit {
+  position: absolute; inset: 0; pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  clip-path: polygon(
+    calc(50% - 47cqw * var(--slice, 9)) 0%, calc(50% + 47cqw * var(--slice, 9)) 0%,
+    calc(50% + 6.11cqw * var(--slice, 9)) 100%, calc(50% - 6.11cqw * var(--slice, 9)) 100%
+  );
+}
+.fl-petal-in { position: absolute; inset: 0; transform-origin: 50% 100%; scale: .64 .78; transition: scale .8s var(--ease-settle); }
+.fl-turn { position: absolute; inset: 0; transform-origin: 50% 100%; }
+.fl-turn svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.fl-bud { fill: color-mix(in srgb, var(--ks-accent) 12%, transparent); stroke: var(--ks-accent); stroke-width: 1.6px; vector-effect: non-scaling-stroke; }
+.fl-bloom { opacity: 0; transition: opacity .6s ease; }
+.fl-vein { fill: none; stroke: var(--ks-accent); stroke-opacity: .55; stroke-width: 1.2px; stroke-linecap: round; vector-effect: non-scaling-stroke; transition: stroke .6s ease; }
+.fl-petal:hover .fl-bud { fill: color-mix(in srgb, var(--ks-accent) 26%, transparent); }
+.fl-petal.is-open .fl-petal-in { scale: 1; }
+.fl-petal.is-open .fl-bloom { opacity: 1; }
+.fl-petal.is-open .fl-vein { stroke: var(--ks-accent-ink); stroke-opacity: .3; }
+
+.fl-core {
+  position: absolute; left: 50%; top: 50%; z-index: 2; width: 19%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, var(--ks-paper), color-mix(in srgb, var(--ks-accent) 78%, var(--ks-paper)) 72%);
+  border: 1.5px solid var(--ks-accent); box-shadow: 0 0 0 5px color-mix(in srgb, var(--ks-accent) 16%, transparent);
+  transition: box-shadow 1.2s ease;
+}
+.fl-head.is-complete .fl-core { box-shadow: 0 0 0 5px color-mix(in srgb, var(--ks-accent) 30%, transparent), 0 0 34px 8px color-mix(in srgb, var(--ks-accent) 45%, transparent); }
+
+/* her lines */
+.fl-side { display: grid; gap: 10px; width: 100%; min-width: 0; text-align: center; }
+.fl-count { margin: 0; }
+.fl-line { min-height: 2.9em; font-family: var(--f-serif); font-style: italic; font-size: clamp(20px, 5vw, 24px); line-height: 1.4; color: var(--ks-ink); overflow-wrap: anywhere; }
+.fl-done { font-family: var(--f-script); font-size: clamp(28px, 7.4vw, 36px); line-height: 1.2; color: var(--ks-accent); overflow-wrap: anywhere; }
+.fl-read { text-align: left; border-top: 1px solid var(--ks-line); padding-top: 4px; }
+.fl-read summary {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; list-style: none; border-radius: 8px;
+  font-family: var(--f-caps); font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: var(--ks-soft);
+}
+.fl-read summary::-webkit-details-marker { display: none; }
+.fl-read summary::before { content: '›'; font-size: 20px; line-height: 1; transition: rotate var(--motion-fast) ease; }
+.fl-read[open] summary::before { rotate: 90deg; }
+.fl-list { margin: 4px 0 6px; padding-left: 1.6em; display: grid; gap: 8px; font-size: 18px; line-height: 1.45; color: var(--ks-ink); }
+.fl-list li { overflow-wrap: anywhere; }
+.fl-list li::marker { color: var(--ks-soft); font-size: 15px; }
+
+@media (min-width: 640px) {
+  .fl-wrap { grid-template-columns: var(--fs) minmax(0, 1fr); align-items: center; gap: 26px; justify-items: stretch; }
+  .fl-side { text-align: left; }
+}
+
+html.reduced-motion .fl-petal-in, html.reduced-motion .fl-read summary::before { transition: none; }
+html.reduced-motion .fl-bloom, html.reduced-motion .fl-vein { transition-duration: .2s; }

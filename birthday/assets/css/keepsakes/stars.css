@@ -1,0 +1,66 @@
+/* Memory stars (keepsakes/stars.js): a night sky of its own in every colour world, the memory stars in a light
+   drawn from the world's accent (so they read on the dark), thin lines between them, a card underneath. */
+
+.ks-room-stars {
+  --kst-sky: radial-gradient(120% 95% at 50% 112%, #3d2163 0%, #1b0f33 46%, #0b0618 100%);
+  --kst-light: color-mix(in srgb, var(--ks-accent) 45%, #fff8ec);
+  --kst-line: color-mix(in srgb, var(--kst-light) 50%, transparent);
+  --kst-speck: rgba(255, 248, 236, .75);
+}
+.ks[data-world="paper"] .ks-room-stars { --kst-sky: radial-gradient(120% 95% at 50% 112%, #3e2c27 0%, #1f1918 48%, #100d0d 100%); }
+.ks[data-world="dawn"] .ks-room-stars { --kst-sky: radial-gradient(120% 95% at 50% 112%, #5b2b55 0%, #2b1331 48%, #150a1b 100%); }
+.ks[data-world="garden"] .ks-room-stars { --kst-sky: radial-gradient(120% 95% at 50% 112%, #22503b 0%, #10261c 48%, #07120d 100%); }
+
+.kst-sky {
+  position: relative; width: 100%; min-height: 200px; overflow: hidden; border-radius: 16px;
+  background: var(--kst-sky); border: 1px solid var(--ks-line);
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, .45);
+}
+.kst-specks { position: absolute; inset: 0; pointer-events: none; }
+.kst-specks i {
+  position: absolute; width: var(--r); height: var(--r); border-radius: 50%; background: var(--kst-speck); opacity: .5;
+}
+html:not(.reduced-motion) .kst-specks i { animation: kst-twinkle 3.6s ease-in-out var(--d) infinite; }
+@keyframes kst-twinkle { 0%, 100% { opacity: .2; } 50% { opacity: .75; } }
+
+.kst-lines { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.kst-lines line { stroke: var(--kst-line); stroke-width: 1.2; stroke-linecap: round; }
+.kst-lines line.is-on { stroke: var(--kst-light); stroke-width: 1.6; }
+
+.kst-star {
+  position: absolute; width: 46px; height: 46px; translate: -50% -50%; padding: 0; margin: 0; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: transparent; cursor: pointer; color: var(--kst-light);
+  -webkit-tap-highlight-color: transparent;
+}
+.kst-star svg {
+  width: 20px; height: 20px; fill: currentColor; overflow: visible;
+  filter: drop-shadow(0 0 4px var(--kst-light)) drop-shadow(0 0 10px color-mix(in srgb, var(--kst-light) 60%, transparent));
+  transition: width var(--motion-fast) var(--ease-settle), height var(--motion-fast) var(--ease-settle);
+}
+.kst-star::after {
+  content: ''; position: absolute; inset: 7px; border-radius: 50%; border: 1px solid transparent;
+}
+.kst-star.is-on svg { width: 28px; height: 28px; }
+.kst-star.is-on::after { border-color: var(--kst-light); box-shadow: 0 0 14px color-mix(in srgb, var(--kst-light) 55%, transparent); }
+.ks .kst-star:focus-visible { outline: 2px solid var(--kst-light); outline-offset: 0; }
+@media (hover: hover) { .kst-star:hover svg { width: 26px; height: 26px; } }
+html.reduced-motion .kst-star svg { transition: none; }
+
+/* ---------- the memory, under the sky ---------- */
+.kst-detail:empty { display: none; }
+.kst-card { display: grid; gap: 14px; }
+.kst-card.has-photo { grid-template-columns: minmax(0, 220px) minmax(0, 1fr); align-items: start; }
+.kst-photo { width: 100%; border: 5px solid var(--ks-paper); border-radius: 4px; box-shadow: 0 10px 24px rgba(0, 0, 0, .25); }
+.kst-words { display: grid; gap: 6px; min-width: 0; }
+.kst-count { font-family: var(--f-caps); font-size: 11.5px; letter-spacing: .24em; text-transform: uppercase; color: var(--ks-soft); }
+.ks-card .kst-name { margin: 0; font-family: var(--f-serif); font-style: italic; font-weight: 500; font-size: clamp(21px, 5.4vw, 25px); line-height: 1.3; color: var(--ks-ink); overflow-wrap: anywhere; }
+.kst-when { font-size: 15.5px; font-style: italic; color: var(--ks-soft); }
+.ks-card .kst-text { font-size: 17.5px; line-height: 1.5; }
+
+@media (max-width: 520px) {
+  .kst-card.has-photo { grid-template-columns: 1fr; }
+  .kst-photo { max-width: 260px; justify-self: center; }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  .kst-card.has-photo { grid-template-columns: minmax(0, 180px) minmax(0, 1fr); }
+}

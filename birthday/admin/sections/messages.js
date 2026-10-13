@@ -7,12 +7,13 @@
  * and the owner's memories for “How it began” (story.memories: add, edit, delete, reorder,
  * each with its own photos).
  */
-import { FILM_CHAPTERS, PERSONAL_FIELDS, MEMORY_KINDS, daysAlive, personalValues, memoriesOf } from '../../assets/js/shared/model.js';
-import { state, change, rerender as rerenderSection } from '../state.js';
+import { FILM_CHAPTERS, PERSONAL_FIELDS, MEMORY_KINDS, daysAlive, personalValues, memoriesOf, metCards } from '../../assets/js/shared/model.js';
+import { KEEPSAKE_TEXT, KEEPSAKE_ROOMS } from '../../assets/js/shared/keepsakes.js';
+import { state, change, rerender as rerenderSection, photoById } from '../state.js';
 import {
   getAt, setAt, deleteAt, deepEqual, clone, plural, STORY, newMemory, memoryLabel, memoryPhotos, unlinkedStoryPhotos, removeMemory, restoreMemory,
 } from '../util.js';
-import { h, icon, autoGrow, toast, nextId, confirmDialog } from '../ui.js';
+import { h, icon, autoGrow, toast, nextId, confirmDialog, openSheet, switchField } from '../ui.js';
 import { addPhotos } from '../photos.js';
 import { openEditor } from '../editor.js';
 import { thumbEl } from './library.js';
@@ -30,6 +31,12 @@ const MEMORY_HINTS = {
   insideJoke: ['Optional. Becomes the P.S. under your signature. Only she needs to get it.', 'P.S. …'],
 };
 const L = (label, hint, add = 'Add a line', long = false) => ({ type: 'list', label, hint, add, long });
+/** A Keepsake Box / “day we met” line: its built-in words show greyed in the empty box (shared/keepsakes.js). */
+const K = (group, key, label, hint = '', long = false) => (long ? T : S)(label, hint, String((KEEPSAKE_TEXT[group] || {})[key] || ''));
+const B = (label, hint, dflt = true) => ({ type: 'bool', label, hint, default: dflt });
+const PHOTOS = (label, hint) => ({ type: 'photos', label, hint });
+const DATE = (label, hint) => ({ type: 'date', label, hint });
+const builtIn = (group, key) => `Built in until you write your own: ${(KEEPSAKE_TEXT[group][key] || []).map((x) => `“${x}”`).join(' · ')}`;
 
 export const SCHEMA = {
   personal: {
@@ -45,6 +52,25 @@ export const SCHEMA = {
       title: S('Title'),
       memories: { type: 'memories', label: 'Your memories', hint: 'In story order. Use the arrows to change the order.', add: 'Add a memory' },
       end: S('Closing line', 'After the last memory.'),
+    },
+  },
+  met: {
+    title: 'The day we met, from my side',
+    desc: 'A chapter right after “How it began”, told from your side only: what you remember of that day, what you noticed, how it felt to you. It plays only once you write a card (a card with no words and no photo is skipped), and one card is enough. Nothing here is made up for you: don’t write what she thought or felt, only what you did. Like everything you publish, these words are public in the site’s files.',
+    fields: {
+      kicker: K('met', 'kicker', 'Small title'),
+      title: K('met', 'title', 'Title'),
+      intro: T('Opening line (optional)', 'Shown before the first card.'),
+      cards: {
+        type: 'objects', label: 'Cards', hint: 'One card per moment, in the order she’ll see them.', add: 'Add a card',
+        item: {
+          heading: S('Heading (optional)', '', 'e.g. Before · That day · Afterwards'),
+          text: T('What I remember', '', 'In your own words…'),
+          feeling: T('How it felt, from my side (optional)', 'Your feelings only.', 'In your own words…'),
+          photos: PHOTOS('Photos (optional)', 'Choose from your photo library, or upload a new one.'),
+        },
+      },
+      end: T('Closing line (optional)', 'After the last card.'),
     },
   },
   invite: { title: 'Invitation', desc: 'The very first screen.', fields: { greeting: S('Greeting', 'The first words she sees, e.g. “Hey {name}.”'), lines: L('Lines', 'Shown one after another.'), button: S('Button'), foot: S('Small print at the bottom') } },
@@ -106,9 +132,40 @@ export const SCHEMA = {
   },
   credits: { title: 'Credits', fields: { opening: S('Opening line'), roles: { type: 'pairs', label: 'Credits', hint: 'Role → name, like film credits.', labels: ['Role', 'Name'], add: 'Add a credit' }, end: S('Last line'), endSub: S('Line under the last line'), postCredits: L('Post-credits scene'), extrasTitle: S('Extra memories — title'), extrasSub: S('Extra memories — subtitle'), secrets: S('Secrets-found line') } },
   gallery: { title: 'Photo gallery', fields: { allTitle: S('Gallery title'), allKicker: S('Gallery small title') } },
+  // ---- the Keepsake Box (edited in admin → Keepsake Box, not here) ----
+  box: { title: 'The box itself', desc: 'The words on the box: shown when it opens.', fields: { kicker: K('box', 'kicker', 'Small title'), title: K('box', 'title', 'Title'), intro: K('box', 'intro', 'Line under the title', '', true), back: K('box', 'back', 'Button: back to the box') } },
+  scrapbook: { title: 'The scrapbook', desc: 'Every real photo in the film, grouped by memory (photos linked to a memory first), with your captions and dates. Captions and dates: Photo library → a photo.', fields: { title: K('scrapbook', 'title', 'Title'), intro: K('scrapbook', 'intro', 'Line under the title'), more: K('scrapbook', 'more', 'Heading for the photos without a memory') } },
+  stars: { title: 'Memory stars', desc: 'One star for each memory you wrote in How it began (Messages). Nothing else is added.', fields: { title: K('stars', 'title', 'Title'), intro: K('stars', 'intro', 'Line under the title') } },
+  comfort: {
+    title: 'If you ever forget how special you are', desc: 'Four choices for a hard day. “A happy memory” shows one of your real memories with its photo (How it began); with none, it says so gently. Rewrite any of the built-in words.',
+    fields: {
+      title: K('comfort', 'title', 'Title'), intro: K('comfort', 'intro', 'Line under the title'),
+      reminderLabel: K('comfort', 'reminderLabel', 'Choice 1 — button'), reminder: K('comfort', 'reminder', 'Choice 1 — the reminder', '', true),
+      smileLabel: K('comfort', 'smileLabel', 'Choice 2 — button'), smile: K('comfort', 'smile', 'Choice 2 — something to smile at', '', true),
+      memoryLabel: K('comfort', 'memoryLabel', 'Choice 3 — button'), memoryEmpty: K('comfort', 'memoryEmpty', 'Choice 3 — when there is no memory yet', '', true),
+      breatheLabel: K('comfort', 'breatheLabel', 'Choice 4 — button'), breathe: K('comfort', 'breathe', 'Choice 4 — a quiet moment', '', true),
+      back: K('comfort', 'back', 'Button: choose something else'),
+    },
+  },
+  wish: { title: 'A lantern for your wish', desc: 'She writes a wish and lets a lantern go. Her wish never leaves her screen: it isn’t saved, sent or shown to you.', fields: { title: K('wish', 'title', 'Title'), intro: K('wish', 'intro', 'Line under the title'), placeholder: K('wish', 'placeholder', 'The empty wish box says'), button: K('wish', 'button', 'Button: let it go'), after: K('wish', 'after', 'After the lantern goes'), privacy: K('wish', 'privacy', 'The privacy line (keep it true)', '', true), again: K('wish', 'again', 'Button: another wish') } },
+  flower: { title: 'A birthday flower', desc: 'A flower that opens petal by petal, one line on each.', fields: { title: K('flower', 'title', 'Title'), intro: K('flower', 'intro', 'Line under the title'), petals: L('Petals (one line each)', builtIn('flower', 'petals'), 'Add a petal'), done: K('flower', 'done', 'When every petal is open') } },
+  appreciation: { title: 'The appreciation wall', desc: 'Cards of things you appreciate about her. Hidden from the box until you write one; an empty card, or one switched off, is never shown.', fields: { title: K('appreciation', 'title', 'Title'), intro: K('appreciation', 'intro', 'Line under the title'), cards: { type: 'objects', label: 'Cards', hint: 'In order. Switch a card off to keep it without showing it.', add: 'Add a card', item: { text: T('What I appreciate', '', 'In your own words…'), show: B('Show this card') } } } },
+  remember: { title: 'The little things I remember', desc: 'Small things you remember. Hidden from the box until you write one.', fields: { title: K('remember', 'title', 'Title'), intro: K('remember', 'intro', 'Line under the title'), items: L('The little things', 'One per line.', 'Add one', true) } },
+  reminders: { title: 'Things that remind me of you', desc: 'Things out in the world that make you think of her. Hidden from the box until you write one.', fields: { title: K('reminders', 'title', 'Title'), intro: K('reminders', 'intro', 'Line under the title'), items: { type: 'objects', label: 'Things', add: 'Add a thing', item: { thing: S('The thing'), why: T('Why (optional)') } } } },
+  awards: { title: 'The awards', desc: 'Playful awards in your words. Hidden from the box until you write one.', fields: { title: K('awards', 'title', 'Title'), intro: K('awards', 'intro', 'Line under the title'), items: { type: 'objects', label: 'Awards', add: 'Add an award', item: { title: S('The award', '', 'e.g. Best … of the year'), line: T('Why she won (optional)') } } } },
+  lore: { title: 'The Deepu files', desc: 'A mock investigation built only from what is already in the film: her names, her favourite things that are switched on, your memories, the number of photos and days. Add your own case notes if you like.', fields: { title: K('lore', 'title', 'Title'), intro: K('lore', 'intro', 'Line under the title'), notes: L('Extra case notes (optional)', 'Your own lines, one per note.', 'Add a note'), verdict: K('lore', 'verdict', 'The verdict') } },
+  quiz: { title: 'Do you remember?', desc: 'Questions made only from your memories and their photos (How it began). Every question can be skipped, every answer is shown, and there is no score.', fields: { title: K('quiz', 'title', 'Title'), intro: K('quiz', 'intro', 'Line under the title', '', true), right: K('quiz', 'right', 'After a right answer'), wrong: K('quiz', 'wrong', 'After another answer'), skip: K('quiz', 'skip', 'Button: skip'), next: K('quiz', 'next', 'Button: next'), end: K('quiz', 'end', 'At the end') } },
+  months: { title: 'Twelve little doors', desc: 'One door for each month of her twentieth year; each opens on her birthday’s date that month, by the clock of the device she uses (no notifications are sent). Wishes, not predictions.', fields: { title: K('months', 'title', 'Title'), intro: K('months', 'intro', 'Line under the title', '', true), locked: K('months', 'locked', 'A closed door says ({date} = its day)'), doors: L('The twelve wishes', `${builtIn('months', 'doors').slice(0, 220)}… Write twelve (one per month, in order) to replace them all.`, 'Add a wish', true) } },
+  letters: { title: 'Letters from different moments', desc: 'Letters for later. A letter with a date stays sealed until that day on her device; without a date it opens at once. Hidden from the box until you write one. Like everything you publish, a letter is in the site’s public files from the moment you publish it: the date only decides when the film shows it.', fields: { title: K('letters', 'title', 'Title'), intro: K('letters', 'intro', 'Line under the title'), locked: K('letters', 'locked', 'A sealed letter says ({date} = its day)'), items: { type: 'objects', label: 'Letters', add: 'Add a letter', item: { label: S('Title', '', 'e.g. For a hard exam week'), opensOn: DATE('Opens on (optional)', 'Leave empty to open at once.'), body: T('The letter', '', 'In your own words…') } } } },
+  voice: { title: 'Hear it in my voice', desc: 'Your voice note again, any time (it appears only once you add one in Audio).', fields: { title: K('voice', 'title', 'Title'), intro: K('voice', 'intro', 'Line under the title') } },
+  coupon: { title: 'A coupon', desc: 'A playful coupon. Your wording; it never asks anything of her.', fields: { title: K('coupon', 'title', 'Name in the box'), head: K('coupon', 'head', 'Coupon title'), line: K('coupon', 'line', 'Coupon line', '', true), small: K('coupon', 'small', 'Small print', '', true) } },
+  shy: { title: 'A message I was too shy to say', desc: 'Something you never quite said. Hidden from the box until you write it. It never asks for a reply.', fields: { title: K('shy', 'title', 'Title'), intro: K('shy', 'intro', 'Line before it'), text: T('The message', '', 'In your own words…'), after: K('shy', 'after', 'Line after it (keep it pressure-free)') } },
+  secret: { title: 'Kuchu Puchu’s secret drawer', desc: 'A locked drawer that opens with her other name or after three secrets found in the film. Inside: the secrets she has found (on her device), hints for the rest, and your secret message if you write one.', fields: { title: K('secret', 'title', 'Title'), intro: K('secret', 'intro', 'Line on the locked drawer', '', true), prompt: K('secret', 'prompt', 'The box for the name'), button: K('secret', 'button', 'Button: open'), wrong: K('secret', 'wrong', 'After a wrong name', '', true), open: K('secret', 'open', 'When it opens'), message: T('Your secret message (optional)', 'Shown inside the drawer.') } },
 };
+/** The Keepsake Box's words are edited in admin → Keepsake Box, not in Messages. */
+export const KEEPSAKE_GROUPS = new Set(['box', ...KEEPSAKE_ROOMS.map((r) => r.id)]);
 
-const ORDER = ['personal', 'story', 'invite', 'gate', 'prologue', 'tower', 'hair', 'names', 'dance', 'lanterns', 'letter', 'little', 'favourites', 'cake', 'constellation', 'birthday', 'hug', 'credits', 'gallery'];
+const ORDER = ['personal', 'story', 'met', 'invite', 'gate', 'prologue', 'tower', 'hair', 'names', 'dance', 'lanterns', 'letter', 'little', 'favourites', 'cake', 'constellation', 'birthday', 'hug', 'credits', 'gallery'];
 const TOKENS = ['name', 'nick1', 'creator', 'photoCount', 'days', 'age'];
 const open = new Set(['personal', 'story', 'invite']);
 let reveal = null; // a group to scroll to after the next render (showGroup)
@@ -158,7 +215,7 @@ export function renderMessages() {
     }, h('code', `{${t}}`), h('span', vals[t] || '—')))));
 
   const groups = [...ORDER];
-  for (const k of Object.keys(text)) if (!groups.includes(k)) groups.push(k);
+  for (const k of Object.keys(text)) if (!groups.includes(k) && !KEEPSAKE_GROUPS.has(k)) groups.push(k);
   const list = h('div.msg-groups', groups.map((g) => groupEl(g)));
   if (reveal) {
     const g = reveal;
@@ -184,7 +241,8 @@ function groupTitle(g) {
   return fc ? fc.label : `${humanize(g)} (extra)`;
 }
 
-function groupEl(g) {
+/** One group's editor (a <details>); the Keepsake Box section uses it for its rooms. */
+export function groupEl(g) {
   const schema = SCHEMA[g];
   const body = h('div.group-body');
   const changedDot = h('span.changed-dot', { title: 'Changed (not published yet)' });
@@ -196,7 +254,7 @@ function groupEl(g) {
     body);
   const sync = () => {
     d.classList.toggle('is-changed', !deepEqual(getAt(state.site, ['text', g]), getAt(state.base, ['text', g])));
-    if (g === 'personal' || g === STORY) sub.textContent = summaryOf(g); // "3 of 7 written", "4 memories · 10 photos", live
+    if (g === 'personal' || g === STORY || g === 'met') sub.textContent = summaryOf(g); // "3 of 7 written", "4 memories · 10 photos", live
   };
   d.addEventListener('toggle', () => {
     if (d.open) { open.add(g); if (!body.childElementCount) fill(); } else open.delete(g);
@@ -225,6 +283,13 @@ function summaryOf(g) {
     const done = PERSONAL_FIELDS.filter((f) => vals[f.key]).length;
     return `${done} of ${PERSONAL_FIELDS.length} written`;
   }
+  if (g === 'met') {
+    const cards = getAt(state.site, ['text', 'met', 'cards']);
+    const n = Array.isArray(cards) ? cards.length : 0;
+    const shown = metCards(state.site).length;
+    if (!n) return 'Not written yet (the chapter is skipped)';
+    return shown === n ? plural(n, 'card') : `${plural(n, 'card')} · ${shown ? `${shown} with words or a photo` : 'none written yet, so the chapter is skipped'}`;
+  }
   if (g === STORY) {
     const n = memoriesOf(state.site).length;
     const photos = (state.site.photos || []).filter((p) => p.chapter === STORY).length;
@@ -244,8 +309,16 @@ function markChanged(path, el) {
 function commit(path, value, { prune = true } = {}) {
   change((site) => {
     const existed = getAt(state.base, path) !== undefined;
-    if (prune && !existed && (value === '' || (Array.isArray(value) && !value.length))) deleteAt(site, path);
-    else setAt(site, path, value);
+    if (prune && !existed && (value === '' || (Array.isArray(value) && !value.length))) {
+      deleteAt(site, path);
+      // a group that only held this new, now-empty value goes too (no empty {} left in the published file)
+      for (let k = path.length - 1; k > 2; k--) {
+        const parent = path.slice(0, k);
+        const v = getAt(site, parent);
+        if (getAt(state.base, parent) === undefined && v && typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length) deleteAt(site, parent);
+        else break;
+      }
+    } else setAt(site, path, value);
   }, { render: false });
 }
 
@@ -256,7 +329,101 @@ function fieldFor(path, spec, key, onAny) {
   if (spec.type === 'pairs') return pairsField(path, spec, onAny);
   if (spec.type === 'objects') return objectsField(path, spec, onAny);
   if (spec.type === 'memories') return memoriesField(path, spec, onAny);
+  if (spec.type === 'photos') return photosField(path, spec, onAny);
+  if (spec.type === 'bool') return boolField(path, spec, onAny);
+  if (spec.type === 'date') return dateField(path, spec, onAny);
   return genericField(path, getAt(state.site, path), key, onAny);
+}
+
+/** On / off (a missing value is the default). */
+function boolField(path, spec, onAny) {
+  const v = getAt(state.site, path);
+  return switchField({
+    label: spec.label, hint: spec.hint || '', checked: v === undefined ? spec.default !== false : v !== false,
+    onchange: (on) => { commit(path, on, { prune: false }); onAny(); },
+  });
+}
+
+/** A calendar day (YYYY-MM-DD) or nothing. */
+function dateField(path, spec, onAny) {
+  const id = nextId('md');
+  const v = getAt(state.site, path);
+  const input = h('input.input', { id, type: 'date', value: typeof v === 'string' ? v : '', 'aria-describedby': spec.hint ? `${id}-hint` : null });
+  input.addEventListener('change', () => { commit(path, input.value); onAny(); });
+  input.addEventListener('input', () => { commit(path, input.value); onAny(); });
+  return h('div.field', h('label.field-label', { for: id }, spec.label), input, spec.hint ? h('p.field-hint', { id: `${id}-hint` }, spec.hint) : null);
+}
+
+/** Real photos the owner can pick (not fan art, which is imagined). */
+const pickable = () => (state.site.photos || []).filter((p) => p.src && p.enabled !== false && p.chapter !== 'fanart');
+
+/** A few photos from the library, by id: shown as thumbnails; choose from the library or upload a new one. */
+function photosField(path, spec, onAny) {
+  const wrap = h('div.field.pick-photos');
+  const ids = () => { const v = getAt(state.site, path); return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []; };
+  const write = (list) => { commit(path, list); paint(); onAny(); };
+  const paint = () => {
+    const list = ids();
+    const items = list.map((id, i) => {
+      const p = photoById(id);
+      const name = p ? (p.label || p.alt || 'Photo') : 'A photo that is no longer in the library';
+      return h('li.pick-item',
+        p ? h('button.mem-thumb', { type: 'button', title: name, 'aria-label': `Edit photo ${name}`, onclick: () => openEditor(id) }, h('span.mem-thumb-frame', { 'aria-hidden': 'true' }, thumbEl(p))) : h('span.pick-missing', '?'),
+        h('button.icon-btn.sm.danger.pick-remove', { type: 'button', 'aria-label': `Remove photo ${i + 1} (${name}) from this card`, onclick: () => write(list.filter((_, k) => k !== i)) }, icon('close')));
+    });
+    wrap.replaceChildren(
+      h('div.field-top', h('span.field-label', `${spec.label} · ${list.length}`)),
+      items.length ? h('ul.pick-list', items) : h('p.field-hint', 'No photos chosen.'),
+      h('div.pick-actions',
+        h('button.btn.sm.ghost', { type: 'button', dataset: { act: 'pick-photos' }, onclick: async () => { const got = await pickPhotos(ids(), spec.label); if (got) write(got); } }, icon('images'), 'Choose from your photos'),
+        h('button.btn.sm.quiet', { type: 'button', onclick: async () => {
+          const before = new Set((state.site.photos || []).map((p) => p.id));
+          await addPhotos({ chapter: 'album' });
+          const fresh = (state.site.photos || []).filter((p) => !before.has(p.id) && p.src);
+          // fan art is imagined, never a real photo: the film never shows it on a card, so it isn't put on one
+          const added = fresh.filter((p) => p.chapter !== 'fanart' && p.enabled !== false).map((p) => p.id);
+          if (added.length < fresh.length) toast('Fan art (and photos switched off) can’t go on a card: it stays in your library, not on this card.');
+          if (added.length) write([...ids(), ...added]);
+        } }, icon('plus'), 'Upload a new photo')),
+      spec.hint ? h('p.field-hint', spec.hint) : null);
+  };
+  paint();
+  return wrap;
+}
+
+/** The photo picker: every real photo, grouped by where it is in the film; tap to choose. */
+async function pickPhotos(current, label) {
+  const chosen = [...current];
+  const all = pickable();
+  const groups = new Map();
+  for (const p of all) { if (!groups.has(p.chapter)) groups.set(p.chapter, []); groups.get(p.chapter).push(p); }
+  const count = h('span');
+  const sync = () => { count.textContent = chosen.length ? `Use ${plural(chosen.length, 'photo')}` : 'Use none'; };
+  const content = all.length ? [...groups.entries()].map(([ch, list]) => h('section.pick-group',
+    h('h3.pick-head', FILM_CHAPTERS.find((c) => c.id === ch)?.label || humanize(ch)),
+    h('ul.pick-grid', list.sort((a, b) => a.order - b.order).map((p) => {
+      const name = p.label || p.alt || 'Photo';
+      const b = h('button.pick-tile', { type: 'button', 'aria-pressed': String(chosen.includes(p.id)), title: name, dataset: { id: p.id } },
+        h('span.mem-thumb-frame', { 'aria-hidden': 'true' }, thumbEl(p)), h('span.sr-only', name), h('span.pick-check', { 'aria-hidden': 'true' }, icon('check')));
+      b.addEventListener('click', () => {
+        const i = chosen.indexOf(p.id);
+        if (i >= 0) chosen.splice(i, 1); else chosen.push(p.id);
+        b.setAttribute('aria-pressed', String(i < 0));
+        sync();
+      });
+      return h('li', b);
+    })))) : [h('p.sheet-text', 'There are no photos in your library yet. Upload one first.')];
+  sync();
+  const s = openSheet({
+    kicker: label || 'Photos', title: 'Choose photos', size: 'lg', key: 'pick-photos',
+    content: [h('p.muted.small', 'Tap to choose or unchoose. They appear in the order you chose them.'), ...content],
+    actions: [
+      h('button.btn.ghost', { type: 'button', onclick: () => s.close(null) }, 'Cancel'),
+      h('button.btn.gold', { type: 'button', 'data-testid': 'pick-done', onclick: () => s.close('ok') }, icon('check'), count),
+    ],
+  });
+  if (s.duplicate) return null;
+  return (await s.result) === 'ok' ? chosen : null;
 }
 
 function stringField(path, label, { long = null, hint = '', onAny = () => {}, placeholder } = {}) {
@@ -380,7 +547,10 @@ function objectsField(path, spec, onAny) {
       for (const k of Object.keys(obj || {})) if (!keys.includes(k)) keys.push(k);
       for (const k of keys) {
         const sub = spec.item && spec.item[k];
-        if (!sub || sub.type === 'string' || sub.type === 'text') card.append(stringField([...path, i, k], sub ? sub.label : humanize(k), { long: sub ? sub.type === 'text' : null, onAny, placeholder: '' }));
+        if (!sub || sub.type === 'string' || sub.type === 'text') card.append(stringField([...path, i, k], sub ? sub.label : humanize(k), { long: sub ? sub.type === 'text' : null, onAny, placeholder: (sub && sub.placeholder) || '', hint: (sub && sub.hint) || '' }));
+        else if (sub.type === 'photos') card.append(photosField([...path, i, k], sub, onAny));
+        else if (sub.type === 'bool') card.append(boolField([...path, i, k], sub, onAny));
+        else if (sub.type === 'date') card.append(dateField([...path, i, k], sub, onAny));
         else card.append(genericField([...path, i, k], obj[k], k, onAny));
       }
       list.append(card);
@@ -389,9 +559,11 @@ function objectsField(path, spec, onAny) {
       type: 'button',
       onclick: () => {
         const a = clone(arr());
-        const tmpl = a[a.length - 1] || Object.fromEntries(Object.keys(spec.item || {}).map((k) => [k, '']));
+        // a new item: the schema's fields with their defaults (an on/off starts on, photos start empty)
+        const fresh = (sub) => (sub.type === 'bool' ? sub.default !== false : sub.type === 'photos' ? [] : '');
+        const tmpl = spec.item ? Object.fromEntries(Object.entries(spec.item).map(([k, sub]) => [k, fresh(sub)])) : null;
         const blank = (v) => (typeof v === 'string' ? '' : Array.isArray(v) ? [] : isObj(v) ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, blank(x)])) : v);
-        a.push(blank(tmpl));
+        a.push(tmpl || blank(a[a.length - 1] || {}));
         write(a);
         rerender((fresh) => { const r = fresh.querySelectorAll(':scope > .obj-list > .obj-card'); return r.length ? r[r.length - 1].querySelector('input, textarea') : null; });
       },
@@ -471,7 +643,12 @@ function memoryCard(m, i, n, { arr, write, move, removeAt, onAny }) {
     onAny();
   };
   const which = h('span.sr-only', ` (memory ${i + 1})`);
-  const ids = { when: nextId('mw'), text: nextId('mt'), kind: nextId('mk') };
+  const ids = { title: nextId('mn'), when: nextId('mw'), text: nextId('mt'), kind: nextId('mk') };
+  const title = h('input.input', {
+    id: ids.title, type: 'text', value: typeof m.title === 'string' ? m.title : '', maxlength: '80', placeholder: 'e.g. The college event', autocomplete: 'off',
+    'aria-describedby': `${ids.title}-hint`, dataset: { fk: `mem-title-${m.id}`, field: 'title' },
+  });
+  title.addEventListener('input', () => set('title', title.value));
   const when = h('input.input', {
     id: ids.when, type: 'text', value: typeof m.when === 'string' ? m.when : '', maxlength: '60', placeholder: 'e.g. October 2026', autocomplete: 'off',
     'aria-describedby': `${ids.when}-hint`, dataset: { fk: `mem-when-${m.id}`, field: 'when' },
@@ -488,6 +665,7 @@ function memoryCard(m, i, n, { arr, write, move, removeAt, onAny }) {
   card.append(
     h('div.obj-head', h('span.obj-title', `Memory ${i + 1}`, h('span.changed-dot', { title: 'Changed (not published yet)' })), rowTools(n, i, { move, remove: removeAt, label: 'memory' })),
     h('div.field', h('label.field-label', { for: ids.when }, 'When (optional)', which.cloneNode(true)), when, h('p.field-hint', { id: `${ids.when}-hint` }, 'A month, a season or a year. Leave it empty if you’d rather not say.')),
+    h('div.field', h('label.field-label', { for: ids.title }, 'Title (optional)', which.cloneNode(true)), title, h('p.field-hint', { id: `${ids.title}-hint` }, 'A short name for it: shown in the Keepsake Box (the memory stars, the scrapbook, the quiz). Empty = its first words.')),
     h('div.field', h('label.field-label', { for: ids.text }, 'The memory', which.cloneNode(true)), text),
     h('div.field', h('label.field-label', { for: ids.kind }, 'Style', which.cloneNode(true)), kind, h('p.field-hint', { id: `${ids.kind}-hint` }, 'How the film stages it.')),
     h('div.field.mem-photos',

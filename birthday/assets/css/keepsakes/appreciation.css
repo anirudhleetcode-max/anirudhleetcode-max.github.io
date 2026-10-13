@@ -1,0 +1,26 @@
+/* The appreciation wall (keepsakes/appreciation.js): notes pinned to a wall, each leaning a little. */
+.ks-room-appreciation [tabindex="-1"] { outline: none; }
+
+.ap-wall {
+  list-style: none; margin: 0; padding: 10px 8px 14px; display: grid; gap: 22px 18px; align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+}
+.ap-item { min-width: 0; }
+.ap-note {
+  position: relative; padding: 26px 18px 20px; border-radius: 4px; rotate: var(--tilt, 0deg);
+  color: var(--ks-paper-ink); background: var(--ap-bg, var(--ks-paper));
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .06), 0 12px 24px rgba(0, 0, 0, .22);
+}
+.ap-tint-0 { --ap-bg: var(--ks-paper); }
+.ap-tint-1 { --ap-bg: color-mix(in srgb, var(--ks-paper) 90%, var(--ks-accent)); }
+.ap-tint-2 { --ap-bg: color-mix(in srgb, var(--ks-paper) 84%, var(--ks-accent)); }
+html.reduced-motion .ap-note { rotate: 0deg; }
+.ap-pin {
+  position: absolute; left: 50%; top: 9px; width: 14px; height: 14px; translate: -50% 0; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--ks-accent) 45%, var(--ks-paper)), var(--ks-accent) 65%);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, .3);
+}
+.ap-text {
+  font-family: var(--f-serif); font-size: 19px; line-height: 1.45; color: var(--ks-paper-ink);
+  white-space: pre-line; overflow-wrap: anywhere;
+}

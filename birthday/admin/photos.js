@@ -38,8 +38,8 @@ export function sceneFor(photoChapter) {
 }
 
 /** `part` plays one movement of a 3D chapter on its own (…&scene=favourites&part=nivin). */
-export function previewUrl(scene, { draft = true, part = null } = {}) {
-  return `../index.html?preview${draft ? '&draft' : ''}${scene ? `&scene=${encodeURIComponent(scene)}` : ''}${scene && part ? `&part=${encodeURIComponent(part)}` : ''}`;
+export function previewUrl(scene, { draft = true, part = null, box = null } = {}) {
+  return `../index.html?preview${draft ? '&draft' : ''}${scene ? `&scene=${encodeURIComponent(scene)}` : ''}${scene && part ? `&part=${encodeURIComponent(part)}` : ''}${box != null ? `&box${box ? `=${encodeURIComponent(box)}` : ''}` : ''}`;
 }
 
 /** Why the film skips a chapter that is switched on ('' when it plays). */
@@ -48,11 +48,12 @@ export function skipReason(site, id) {
   if (id === 'little') return 'Every scene of “The little things” is switched off in Theme, so the film skips this chapter.';
   if (id === 'favourites') return 'Pani puri and Manchuria are switched off in Theme and the fan-art photoshoot has no image (or is off too), so the film skips this chapter.';
   if (id === 'video') return 'No video uploaded, so the film skips this chapter (add one in Video).';
+  if (id === 'met') return 'No card written yet, so the film skips this chapter (write one in Messages → The day we met).';
   return 'The film skips this chapter.';
 }
 
 /** Save the draft, then open the film preview in a new tab (popup-safe). */
-export async function openPreview(scene = null, { draft = true, part = null } = {}) {
+export async function openPreview(scene = null, { draft = true, part = null, box = null } = {}) {
   // a chapter that isn't in the film (switched off, or nothing in it to play) would quietly start at the beginning
   const name = scene ? (FILM_CHAPTERS.find((c) => c.id === scene) || {}).label || scene : '';
   if (scene && (state.site.chapters || []).some((c) => c.id === scene && c.enabled === false)) {
@@ -63,7 +64,7 @@ export async function openPreview(scene = null, { draft = true, part = null } = 
     toast(`“${name}”: ${skipReason(state.site, scene)}`, { type: 'error' });
     return;
   }
-  const url = previewUrl(scene, { draft, part });
+  const url = previewUrl(scene, { draft, part, box });
   const w = window.open('', '_blank');
   await flushSave();
   if (w) {
