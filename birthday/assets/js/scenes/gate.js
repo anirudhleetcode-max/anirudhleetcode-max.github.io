@@ -5,6 +5,7 @@
 import { esc } from '../core/art.js';
 import { shootingStar } from '../core/sky.js';
 import { nightscape, lanternArt, lightLantern, words, LANTERN_BODY } from './invite.js';
+import { createWorld } from './gate/world.js';
 
 const YEARS = 20;
 const pad = (n) => String(n).padStart(2, '0');
@@ -168,6 +169,11 @@ export default {
     window.addEventListener('resize', onResize);
     this.cleanup.push(() => { window.removeEventListener('resize', onResize); cancelAnimationFrame(rz); });
 
+    /* ---------- the little world around the countdown (gate/world.js): optional, never in the way ---------- */
+    let gw = null;
+    try { gw = createWorld(el, ctx, { world, lanternBox }); } catch (err) { console.warn('[gate] the little world did not start', err); }
+    this.gw = gw;
+
     /* ---------- entrance ---------- */
     const D = reduced ? 0.4 : 1;
     const intro = gsap.timeline({ delay: 0.2 });
@@ -225,6 +231,7 @@ export default {
       }
       const lab = labels[label];
       lab.textContent = value === 1 ? label.replace(/s$/, '') : label;
+      if (u === 'm' && prev) gw?.pulse(countEl);
     };
     let opened = false;
     let lastAria = '';
@@ -253,6 +260,7 @@ export default {
     /* ---------- midnight ---------- */
     const celebrate = async () => {
       fx.dust({ density: 0.32, alpha: 1 });
+      try { gw?.midnight(); } catch { /* the little world is optional */ }
       // the copy steps aside so the light can speak
       track(gsap.to([kickerEl, titleEl, countEl, subEl], { opacity: 0, y: reduced ? 0 : -6, filter: 'blur(8px)', duration: 1.1, stagger: 0.06, ease: 'power2.in', delay: 0.6 }));
       await ctx.wait(reduced ? 0.6 : 1.2);
@@ -336,6 +344,8 @@ export default {
     (this.timers || []).forEach((id) => { clearTimeout(id); clearInterval(id); });
     clearTimeout(this.tickTimer);
     (this.tweens || []).forEach((tw) => tw && tw.kill());
+    try { this.gw?.dispose(); } catch { /* ignore */ }
+    this.gw = null;
     this.cleanup = [];
     this.timers = [];
     this.tweens = [];

@@ -1,0 +1,128 @@
+/* ---------- the countdown's little world (scenes/gate/world.js, scenes/gate/girl.js) ----------
+   .gw has no z-index of its own (no stacking context), so its pieces sit between the gate's layers:
+   fireflies just above the water, hearts and stars in the sky, her jetty in front of the lantern arc,
+   the gift and the cupcake by the shore, the little bar in the bottom corners. */
+.gw { position: absolute; inset: 0; pointer-events: none; }
+:where(.gw) button {
+  pointer-events: auto; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
+}
+:where(.gw) button:focus-visible { outline: 2px solid var(--gold-hi, #ffe3a3); outline-offset: 3px; border-radius: 12px; }
+.gw svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+.gw-flies { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; mix-blend-mode: screen; }
+.gw-sky { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+
+/* hearts: placed by transform (left/top stay 0); the button is the hit area (≥ 44 px), the heart inside */
+.gw-heart {
+  position: absolute; left: 0; top: 0; min-width: 44px; min-height: 44px; display: grid; place-items: center;
+  will-change: transform; filter: drop-shadow(0 0 10px rgba(255, 160, 190, .45));
+}
+.gw-heart svg { width: 100%; height: 100%; }
+.gw-heart::before { content: ''; position: absolute; inset: -8px; }
+
+/* the wish star and the faint constellation stars: tiny to look at, 44 px to tap */
+.gw-wish, .gw-con { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; display: grid; place-items: center; }
+.gw-wish svg { width: 18px; height: 18px; color: #fff6dc; filter: drop-shadow(0 0 6px rgba(255, 236, 180, .9)); animation: gw-twinkle 3.2s ease-in-out infinite; }
+.gw-con svg { width: 9px; height: 9px; color: #cfc4ff; opacity: .55; transition: opacity .4s, color .4s, transform .4s; }
+.gw-con.is-lit svg { opacity: 1; color: #ffe3a3; transform: scale(1.5); filter: drop-shadow(0 0 5px rgba(255, 220, 150, .9)); }
+.gw-con-line { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.gw-con-line path { fill: none; stroke: #ffe3a3; stroke-width: 1; stroke-linejoin: round; stroke-dasharray: 600; stroke-dashoffset: 600; opacity: 0; transition: stroke-dashoffset 2.4s ease, opacity .6s; filter: drop-shadow(0 0 4px rgba(255, 210, 140, .8)); }
+.gw-con-line.is-on path { stroke-dashoffset: 0; opacity: .85; }
+@keyframes gw-twinkle { 0%, 100% { opacity: .75; transform: scale(.9) rotate(0deg); } 50% { opacity: 1; transform: scale(1.15) rotate(12deg); } }
+
+/* her jetty (the figurine's canvas) — in front of the lantern arc, behind the midnight button */
+.gw-jetty { position: absolute; z-index: 3; pointer-events: none; }
+.gw-girl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
+.gw-hello {
+  position: absolute; left: 22%; right: 22%; top: 18%; bottom: 8%; border-radius: 40% 40% 20% 20%;
+}
+.gw-hello:focus-visible { outline-offset: 0; }
+
+/* the gift and the cupcake by the shore */
+.gw-gift, .gw-cup { position: absolute; z-index: 3; min-width: 44px; min-height: 44px; }
+.gw-gift { filter: drop-shadow(0 6px 10px rgba(10, 4, 30, .55)); }
+.gw-gift .gw-lid { transform-box: view-box; }
+.gw-cup .gw-cup-flame { animation: gw-flicker 1.6s ease-in-out infinite alternate; transform-box: view-box; transform-origin: 32px 18px; }
+.gw-cup.is-midnight { filter: drop-shadow(0 0 14px rgba(255, 200, 110, .75)); }
+@keyframes gw-flicker { from { transform: scaleY(1) skewX(0deg); } 50% { transform: scaleY(1.08) skewX(-3deg); } to { transform: scaleY(.95) skewX(3deg); } }
+
+/* moon-butterflies (placed by transform) */
+.gw-fly {
+  position: absolute; left: 0; top: 0; z-index: 4; width: 44px; height: 44px; margin: -22px 0 0 -22px; padding: 6px;
+  will-change: transform; filter: drop-shadow(0 0 8px hsla(var(--fh, 220), 90%, 75%, .7));
+}
+.gw-wings path { fill: hsla(var(--h), 85%, 78%, .9); stroke: hsla(var(--h), 90%, 92%, .9); stroke-width: .6; }
+.gw-wl, .gw-wr { transform-box: view-box; transform-origin: 20px 15px; animation: gw-flap .32s ease-in-out infinite alternate; }
+.gw-wr { animation-name: gw-flap-r; }
+@keyframes gw-flap { from { transform: scaleX(1); } to { transform: scaleX(.25); } }
+@keyframes gw-flap-r { from { transform: scaleX(1); } to { transform: scaleX(.25); } }
+
+/* the note: one short line at a time, above the bottom bar, never over the countdown */
+.gw-note {
+  position: absolute; left: 50%; bottom: calc(var(--safe-b, 0px) + 74px); z-index: 6; translate: -50% 0;
+  width: min(92vw, 420px); display: flex; align-items: flex-start; gap: 6px; pointer-events: auto;
+  padding: 12px 8px 12px 18px; border-radius: 18px;
+  background: linear-gradient(180deg, rgba(48, 30, 86, .86), rgba(26, 16, 52, .9));
+  border: 1px solid rgba(255, 214, 140, .4); box-shadow: 0 10px 34px rgba(8, 3, 24, .55), 0 0 26px rgba(255, 190, 120, .14);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.gw-note[hidden] { display: none; }
+.gw-note p { margin: 0; flex: 1; padding-top: 4px; font-family: var(--f-serif); font-style: italic; font-size: clamp(15px, 4.2vw, 18px); line-height: 1.4; color: #fbefff; text-wrap: pretty; }
+.gw-note-x { flex: none; width: 44px; height: 44px; margin: -6px 0 -6px 0; border-radius: 50%; color: #d9c8f5; font-size: 15px; display: grid; place-items: center; }
+
+/* the little bar: secrets bottom left, sound bottom right (the safe area respected) */
+.gw-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; pointer-events: none; }
+.gw-help, .gw-sound {
+  position: absolute; bottom: calc(var(--safe-b, 0px) + 14px); min-width: 44px; height: 44px; padding: 0 14px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 999px;
+  font-family: var(--f-caps); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: #f3e6c8;
+  background: rgba(30, 18, 60, .55); border: 1px solid rgba(255, 214, 140, .32);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); opacity: .85; transition: opacity .3s, border-color .3s;
+}
+.gw-help { left: calc(var(--safe-l, 0px) + 14px); }
+.gw-sound { right: calc(var(--safe-r, 0px) + 14px); }
+.gw-help span, .gw-sound span[aria-hidden] { font-size: 15px; letter-spacing: 0; color: var(--gold-hi, #ffe3a3); }
+.gw-count { font-weight: 400; letter-spacing: .08em; }
+.gw-count:empty { display: none; }
+.gw-sound[aria-pressed="true"] { border-color: rgba(255, 214, 140, .7); opacity: 1; }
+@media (hover: hover) { .gw-help:hover, .gw-sound:hover { opacity: 1; border-color: rgba(255, 214, 140, .7); } }
+@media (max-width: 359px) { .gw-sound-l { display: none; } .gw-sound { padding: 0; width: 44px; } }
+
+.gw-panel {
+  position: absolute; left: calc(var(--safe-l, 0px) + 12px); bottom: calc(var(--safe-b, 0px) + 68px); z-index: 7; pointer-events: auto;
+  width: min(calc(100vw - 24px), 360px); max-height: 60vh; overflow: auto; padding: 16px 16px 12px; border-radius: 18px;
+  background: linear-gradient(180deg, rgba(48, 30, 86, .94), rgba(22, 13, 46, .96));
+  border: 1px solid rgba(255, 214, 140, .4); box-shadow: 0 14px 40px rgba(8, 3, 24, .6);
+  font-family: var(--f-serif); color: #efe3ff;
+}
+.gw-panel[hidden] { display: none; }
+.gw-panel-t { margin: 0 0 10px; font-style: italic; font-size: 16px; line-height: 1.4; }
+.gw-panel ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.gw-panel li { font-size: 15px; line-height: 1.4; color: #cdbbec; display: flex; gap: 8px; }
+.gw-panel li.is-found { color: #fff1d0; }
+.gw-panel li span { color: var(--gold-hi, #ffe3a3); flex: none; width: 1em; text-align: center; }
+.gw-panel-x {
+  display: block; margin: 12px 0 0 auto; min-height: 44px; padding: 0 18px; border-radius: 999px;
+  font-family: var(--f-caps); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: #fff3d6;
+  border: 1px solid rgba(255, 214, 140, .5);
+}
+
+/* the countdown: each number on a soft pane of glass with a thin golden rim; once a minute it breathes (--pulse) */
+.gc-unit { position: relative; }
+.gc-unit::after {
+  content: ''; position: absolute; inset: -.1em -.06em -.04em; z-index: -1; pointer-events: none; border-radius: .16em;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(120, 90, 190, .06) 60%, rgba(255, 200, 120, .05));
+  border: 1px solid rgba(255, 214, 140, calc(.16 + var(--pulse, 0) * .3));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 0 calc(var(--pulse, 0) * 26px) rgba(255, 196, 110, calc(var(--pulse, 0) * .35));
+}
+.gate-count { --pulse: 0; }
+
+/* reduced motion: still things stay still */
+.reduced-motion .gw-wish svg, .reduced-motion .gw-cup .gw-cup-flame { animation: none; }
+.reduced-motion .gw-wl, .reduced-motion .gw-wr { animation-duration: 1.4s; }
+.reduced-motion .gw-con-line path { transition: opacity .6s; }
+@media (prefers-reduced-motion: reduce) {
+  .gw-wish svg, .gw-cup .gw-cup-flame { animation: none; }
+  .gw-wl, .gw-wr { animation-duration: 1.4s; }
+}
