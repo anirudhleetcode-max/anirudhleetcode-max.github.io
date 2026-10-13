@@ -141,6 +141,7 @@ export function createWorld(el, ctx, { world, lanternBox }) {
   /* ---------------------------------------------------------------- notes (one at a time) */
   let noteTimer = 0;
   const say = (text, { hold = 5200 } = {}) => {
+    if (midnightDone) return; // (at midnight the gate's own words and button have the screen)
     clearTimeout(noteTimer);
     noteP.textContent = text;
     note.hidden = false;
@@ -174,6 +175,7 @@ export function createWorld(el, ctx, { world, lanternBox }) {
     panel.querySelector('ul').innerHTML = avail().map((k) => `<li class="${found.has(k) ? 'is-found' : ''}"><span aria-hidden="true">${found.has(k) ? '✦' : '·'}</span> ${esc(found.has(k) ? NOTES[k] : HINTS[k])}</li>`).join('');
   };
   const togglePanel = (open = panel.hidden) => {
+    if (open && midnightDone) return;
     if (open) { renderPanel(); panel.hidden = false; tw(gsap.fromTo(panel, { opacity: 0, y: reduced ? 0 : 10 }, { opacity: 1, y: 0, duration: 0.35 })); panel.querySelector('.gw-panel-x').focus({ preventScroll: true }); } else { panel.hidden = true; help.focus({ preventScroll: true }); }
     help.setAttribute('aria-expanded', String(!panel.hidden));
   };
@@ -480,7 +482,8 @@ export function createWorld(el, ctx, { world, lanternBox }) {
       const dx = h.x - px;
       const dy = h.y - py;
       const d = Math.hypot(dx, dy);
-      const push = d < 110 && !reduced ? (1 - d / 110) * 22 : 0;
+      // (shy, never out of reach: the lean fades to nothing as the pointer comes within tapping distance)
+      const push = d < 110 && !reduced ? (1 - d / 110) * 12 * Math.min(1, d / 44) : 0;
       h.ox += ((push ? (dx / d) * push : 0) - h.ox) * 0.08;
       h.oy += ((push ? (dy / d) * push : 0) - h.oy) * 0.08;
       h.b.style.transform = `translate3d(${(h.x + fx0 + h.ox).toFixed(1)}px, ${(h.y + fy0 + h.oy).toFixed(1)}px, 0) rotate(${(Math.sin(time * 0.6 + h.phase) * 8).toFixed(1)}deg)`;
@@ -585,6 +588,10 @@ export function createWorld(el, ctx, { world, lanternBox }) {
       hideNote();
       panel.hidden = true;
       help.setAttribute('aria-expanded', 'false');
+      // the little bar steps aside so nothing ever sits over the gate's "come in" button
+      const bar = root.querySelector('.gw-bar');
+      bar.inert = true;
+      tw(gsap.to(bar, { opacity: 0, duration: 0.8, onComplete: () => { bar.hidden = true; } }));
       const r = lanternBox.getBoundingClientRect();
       girl?.midnight(r.left + r.width / 2, r.top + r.height / 2);
       cup.classList.add('is-midnight');
